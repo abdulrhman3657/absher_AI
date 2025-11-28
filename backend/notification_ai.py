@@ -52,20 +52,21 @@ def build_services_status_for_notifications(user: User) -> str:
 # -------------------------------------------------
 proactive_sms_prompt = ChatPromptTemplate.from_template(
     """
-You are an assistant that writes VERY short Arabic/English-friendly SMS messages
-for the Absher platform users.
+You are an assistant that writes VERY short SMS messages in Arabic only
+for Absher platform users.
+All output must be in Arabic.
 
 Context:
 - User name: {user_name}
 - Service: {service_name}
-- Current status: {service_status}  (e.g. EXPIRING in X days)
+- Current status: {service_status}
 - Days left until expiry: {days_left}
 
 Requirements for the SMS:
 - Max ~160 characters.
-- Start with "Absher Assistant:".
-- Use polite and clear language.
-- Mention the service and how many days are left (or that it is expired).
+- Start with "مساعد أبشر:".
+- Use polite and clear Arabic.
+- Mention the service and expiry status.
 - Invite the user to log in or reply to renew.
 - Do NOT include any links.
 - Return ONLY the SMS text, no explanations.
