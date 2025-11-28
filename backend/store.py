@@ -2,17 +2,13 @@
 import json
 import uuid
 from datetime import datetime, timezone, timedelta
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from langchain_community.vectorstores import FAISS
 
-from models import Notification, User, UserService
-
 from config import embeddings
-from models import Notification, User
-
+from models import Notification, User, UserService, ServiceType
 
 # In-memory users + notifications
 USERS: Dict[str, User] = {}
@@ -34,11 +30,11 @@ def _load_users_from_json() -> None:
     loaded: Dict[str, User] = {}
     for u in raw_users:
         user_obj = User(**u)
-        loaded[user_obj.national_id] = user_obj # key is national_id
+        # key is national_id
+        loaded[user_obj.national_id] = user_obj
 
     USERS = loaded
     print(f"[STORE] Loaded {len(USERS)} users from {USERS_JSON_PATH}")
-
 
 
 _load_users_from_json()
@@ -50,6 +46,56 @@ def get_user_by_username(username: str) -> Optional[User]:
         if u.username == username:
             return u
     return None
+
+
+# ---------------- Services helper ----------------
+
+def iter_user_services(user: User) -> List[UserService]:
+    """
+    Convert the user's ServicesExpiry (user.services) into a list of
+    UserService objects. This gives us a uniform iterable representation
+    for proactive checks and renewals.
+    """
+    s = user.services
+    services: List[UserService] = []
+
+    if s.national_id_expire_date:
+        services.append(
+            UserService(
+                service_type=ServiceType.NATIONAL_ID,
+                service_name="National ID",
+                expiry_date=s.national_id_expire_date,
+            )
+        )
+
+    if s.driver_license_expire_date:
+        services.append(
+            UserService(
+                service_type=ServiceType.LICENSE,
+                service_name="Driver License",
+                expiry_date=s.driver_license_expire_date,
+            )
+        )
+
+    if s.vehicle_registration_expire_date:
+        services.append(
+            UserService(
+                service_type=ServiceType.VEHICLE,
+                service_name="Vehicle Registration",
+                expiry_date=s.vehicle_registration_expire_date,
+            )
+        )
+
+    if s.passport_expire_date:
+        services.append(
+            UserService(
+                service_type=ServiceType.PASSPORT,
+                service_name="Passport",
+                expiry_date=s.passport_expire_date,
+            )
+        )
+
+    return services
 
 
 # ---------------- Notifications ----------------
@@ -95,6 +141,7 @@ def _update_user_notification_index(user_id: str) -> None:
     )
     USER_NOTIFICATION_INDEX[user_id] = index
 
+
 # Fuzzy notification search
 def search_notifications(user_id: str, query: str, k: int = 3) -> List[Notification]:
     index = USER_NOTIFICATION_INDEX.get(user_id)
@@ -104,6 +151,7 @@ def search_notifications(user_id: str, query: str, k: int = 3) -> List[Notificat
     docs = index.similarity_search(query, k=k)
     notif_ids = {doc.metadata.get("notif_id") for doc in docs}
     return [n for n in NOTIFICATIONS if n.id in notif_ids]
+
 
 def _save_users_to_json() -> None:
     """Persist current USERS dict back to users.json."""
@@ -136,6 +184,8 @@ def renew_expiring_services_for_user(
     """
     Renew all services for this user that are expiring in <= threshold_days.
     For demo we extend each by 1 year from the later of now/expiry.
+
+    Returns a list of UserService objects with the NEW expiry dates.
     """
     user = USERS.get(user_id)
     if not user:
@@ -144,11 +194,26 @@ def renew_expiring_services_for_user(
     now = datetime.now(timezone.utc)
     renewed: List[UserService] = []
 
-    for svc in user.services:
+    # Work with logical UserService objects
+    services = iter_user_services(user)
+
+    for svc in services:
         days_left = (svc.expiry_date - now).days
         if days_left <= threshold_days:
             base = max(now, svc.expiry_date)
-            svc.expiry_date = base + timedelta(days=365)
+            new_expiry = base + timedelta(days=365)
+            svc.expiry_date = new_expiry
+
+            # Write back into the underlying ServicesExpiry on the user
+            if svc.service_type == ServiceType.NATIONAL_ID:
+                user.services.national_id_expire_date = new_expiry
+            elif svc.service_type == ServiceType.LICENSE:
+                user.services.driver_license_expire_date = new_expiry
+            elif svc.service_type == ServiceType.VEHICLE:
+                user.services.vehicle_registration_expire_date = new_expiry
+            elif svc.service_type == ServiceType.PASSPORT:
+                user.services.passport_expire_date = new_expiry
+
             renewed.append(svc)
 
     if renewed:

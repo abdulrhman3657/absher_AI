@@ -7,7 +7,7 @@ from typing import List
 import schedule
 
 from models import Notification, UserService
-from store import USERS, add_notification, get_user_notifications
+from store import USERS, add_notification, get_user_notifications, iter_user_services
 from notification_ai import generate_proactive_sms_for_service
 
 EXPIRY_SMS_THRESHOLD_DAYS = 3  # send SMS if expiry <= 3 days
@@ -34,7 +34,8 @@ async def run_proactive_engine() -> List[Notification]:
     now = datetime.now(timezone.utc)
 
     for user in USERS.values():
-        for svc in user.services:
+        # Use logical service objects instead of ServicesExpiry
+        for svc in iter_user_services(user):
             days_left = (svc.expiry_date - now).days
 
             if days_left <= EXPIRY_SMS_THRESHOLD_DAYS:
