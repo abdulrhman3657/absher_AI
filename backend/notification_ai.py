@@ -5,33 +5,45 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from config import notification_llm
 from models import User, UserService
+from typing import Optional
 
 # We can reuse the same logic as build_services_status,
 # but keep it local here to avoid circular imports.
 def build_services_status_for_notifications(user: User) -> str:
     now = datetime.now(timezone.utc)
+    s = user.services
 
-    if not user.services:
+    if not s:
         return "User has no registered services."
 
     lines = []
-    for svc in user.services:
-        expiry = svc.expiry_date
-        if expiry.tzinfo is None:
-            expiry = expiry.replace(tzinfo=timezone.utc)
 
-        days_left = (expiry - now).days
+    def add_status(label: str, expiry: Optional[datetime]) -> None:
+        if expiry is None:
+            return
+        if expiry.tzinfo is None:
+            expiry_aware = expiry.replace(tzinfo=timezone.utc)
+        else:
+            expiry_aware = expiry
+
+        days_left = (expiry_aware - now).days
 
         if days_left < 0:
-            status = f"EXPIRED {-days_left} day(s) ago (on {expiry.date()})."
+            status = f"EXPIRED {-days_left} day(s) ago (on {expiry_aware.date()})."
         elif days_left <= 3:
-            status = f"EXPIRING in {days_left} day(s), on {expiry.date()}."
+            status = f"EXPIRING in {days_left} day(s), on {expiry_aware.date()}."
         else:
-            status = f"VALID, expires in {days_left} day(s) on {expiry.date()}."
+            status = f"VALID, expires in {days_left} day(s) on {expiry_aware.date()}."
 
-        lines.append(f"- {svc.service_name}: {status}")
+        lines.append(f"- {label}: {status}")
 
-    return "\n".join(lines)
+    add_status("National ID", s.national_id_expire_date)
+    add_status("Driver License", s.driver_license_expire_date)
+    add_status("Vehicle Registration", s.vehicle_registration_expire_date)
+    add_status("Passport", s.passport_expire_date)
+
+    return "\n".join(lines) if lines else "User has no registered services."
+
 
 
 # -------------------------------------------------

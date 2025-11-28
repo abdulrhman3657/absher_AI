@@ -170,7 +170,7 @@ async def confirm_action(payload: ConfirmActionRequest) -> ConfirmActionResponse
         raise HTTPException(status_code=404, detail="User not found")
 
     if payload.accepted:
-        renewed = renew_expiring_services_for_user(user.id)
+        renewed = renew_expiring_services_for_user(user.national_id)
 
         if renewed:
             services_str = ", ".join(
@@ -178,17 +178,17 @@ async def confirm_action(payload: ConfirmActionRequest) -> ConfirmActionResponse
                 for svc in renewed
             )
             detail = (
-                f"Action {payload.action_id} accepted for user {user.id}. "
+                f"Action {payload.action_id} accepted for user {user.national_id}. "
                 f"The following services were renewed: {services_str}."
             )
         else:
             detail = (
-                f"Action {payload.action_id} accepted for user {user.id}, "
+                f"Action {payload.action_id} accepted for user {user.national_id}, "
                 "but no expiring services were found to renew."
             )
         status = "accepted"
     else:
-        detail = f"Action {payload.action_id} rejected by user {user.id}."
+        detail = f"Action {payload.action_id} rejected by user {user.national_id}."
         status = "rejected"
 
     print(f"[ACTION] {status.upper()}: {detail}")

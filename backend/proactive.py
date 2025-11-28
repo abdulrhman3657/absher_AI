@@ -41,7 +41,7 @@ async def run_proactive_engine() -> List[Notification]:
                 # Check if we already sent an SMS recently for this service
                 existing = [
                     n
-                    for n in get_user_notifications(user.id)
+                    for n in get_user_notifications(user.national_id)
                     if n.channel == "sms"
                     and n.meta.get("service_type") == svc.service_type
                     and (now - n.created_at).days < 7
@@ -60,7 +60,7 @@ async def run_proactive_engine() -> List[Notification]:
                 )
 
                 notif = add_notification(
-                    user_id=user.id,
+                    user_id=user.national_id,
                     channel="sms",
                     message=sms_text,
                     meta={

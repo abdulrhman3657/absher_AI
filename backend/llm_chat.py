@@ -39,30 +39,49 @@ def build_notifications_context(notifs: List[Notification]) -> str:
     return "\n".join(lines)
 
 
+from datetime import datetime, timezone
+from typing import Optional
+
+from models import User  # adjust import if needed
+
+
 def build_services_status(user: User) -> str:
     now = datetime.now(timezone.utc)
+    s = user.services
 
-    if not user.services:
+    if not s:
         return "User has no registered services."
 
     lines = []
-    for svc in user.services:
-        expiry = svc.expiry_date
-        if expiry.tzinfo is None:
-            expiry = expiry.replace(tzinfo=timezone.utc)
 
-        days_left = (expiry - now).days
+    def add_status(label: str, expiry: Optional[datetime]) -> None:
+        if expiry is None:
+            return
+
+        # make sure it's timezone-aware
+        if expiry.tzinfo is None:
+            expiry_aware = expiry.replace(tzinfo=timezone.utc)
+        else:
+            expiry_aware = expiry
+
+        days_left = (expiry_aware - now).days
 
         if days_left < 0:
-            status = f"EXPIRED {-days_left} day(s) ago (on {expiry.date()})."
+            status = f"EXPIRED {-days_left} day(s) ago (on {expiry_aware.date()})."
         elif days_left <= 3:
-            status = f"EXPIRING in {days_left} day(s), on {expiry.date()}."
+            status = f"EXPIRING in {days_left} day(s), on {expiry_aware.date()}."
         else:
-            status = f"VALID, expires in {days_left} day(s) on {expiry.date()}."
+            status = f"VALID, expires in {days_left} day(s) on {expiry_aware.date()}."
 
-        lines.append(f"- {svc.service_name}: {status}")
+        lines.append(f"- {label}: {status}")
 
-    return "\n".join(lines)
+    add_status("National ID", s.national_id_expire_date)
+    add_status("Driver License", s.driver_license_expire_date)
+    add_status("Vehicle Registration", s.vehicle_registration_expire_date)
+    add_status("Passport", s.passport_expire_date)
+
+    return "\n".join(lines) if lines else "User has no registered services."
+
 
 
 # ==========================================================
@@ -122,7 +141,7 @@ async def handle_chat(
     # This is the text the agent sees as "input"
     # The SYSTEM_PROMPT in absher_agent.py explains how to interpret this.
     agent_input = f"""
-User id: {user.id}
+User id: {user.national_id}
 User name: {user.name}
 
 Current services status (SOURCE OF TRUTH):
@@ -135,7 +154,7 @@ User message:
 {message}
 """.strip()
 
-    agent = _get_agent_for_user(user.id)
+    agent = _get_agent_for_user(user.national_id)
 
     # AgentExecutor from initialize_agent (with return_intermediate_steps=True)
     # is synchronous; we wrap it in a thread if we want true async later,
