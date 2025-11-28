@@ -75,7 +75,7 @@ def _proposed_action_from_tool_input(tool_input: dict) -> ProposedAction:
     tool_input will look like:
       {
         "user_id": "user123",
-        "service_type": "iqama",
+        "service_type": "national_id",
         "requires_payment": true,
         "amount": 150.0,
         "currency": "SAR",

@@ -35,7 +35,7 @@ class SubmitRenewalInput(BaseModel):
         description="Absher internal user id (e.g., 'user123')."
     )
     service_type: Literal[
-        "iqama",
+        "national_id",
         "driver_license",
         "passport",
         "vehicle_registration",

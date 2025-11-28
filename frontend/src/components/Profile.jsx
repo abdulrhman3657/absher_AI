@@ -7,7 +7,7 @@ export default function Profile({ userId, userName, notifications }) {
 
       <div className="space-y-3 text-sm">
         <div>
-          <div className="text-xs text-slate-500">User ID</div>
+          <div className="text-xs text-slate-500">ID Number</div>
           <div className="font-medium">{userId}</div>
         </div>
 

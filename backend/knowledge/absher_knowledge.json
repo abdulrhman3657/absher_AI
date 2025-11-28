@@ -1,10 +1,11 @@
 {
   "sections": [
     {
-      "id": "iqama_renewal",
-      "title": "Iqama Renewal",
-      "text": "Iqama renewal requires the user to have a valid medical insurance, updated address, and payment of renewal fees. The fee varies depending on the employment status. Renewal is done inside Absher under Services > My Services > Iqama. The system may require updating personal information before allowing payment."
-    },
+      "id": "national_id_renewal",
+      "title": "National ID Renewal",
+      "text": "National ID (ID Number) renewal requires the user to have a valid medical insurance, updated address, and payment of renewal fees. The fee may vary depending on the user's status. Renewal is done inside Absher under Services > My Services > National ID. The system may require updating personal information before allowing payment."
+    }
+,
     {
       "id": "driver_license",
       "title": "Driver License Renewal",

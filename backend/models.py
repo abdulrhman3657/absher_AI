@@ -8,8 +8,9 @@ from pydantic import BaseModel, Field
 
 # ---------- Core domain models ----------
 
+# after
 class ServiceType(str, Enum):
-    IQAMA = "iqama"
+    NATIONAL_ID = "national_id"
     LICENSE = "driver_license"
     PASSPORT = "passport"
     VEHICLE = "vehicle_registration"
