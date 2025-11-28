@@ -102,6 +102,8 @@ User:
 Current services status:
 {services_status}
 
+You must speak in Arabic.
+
 You must produce two messages:
 
 1) IN_APP message:
@@ -150,6 +152,6 @@ async def generate_login_summary_messages(user: User) -> str:
     else:
         # Fallback: if format not perfect, just use whole text as in-app
         in_app = text
-        sms = "Absher Assistant: تم تسجيل الدخول. كل شيء على ما يرام حالياً."
+        sms = "Absher Assistant:Login completed. Everything is fine at the moment."
 
     return in_app, sms

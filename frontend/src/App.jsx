@@ -67,7 +67,6 @@ export default function App() {
     if (userId) {
       fetchNotifications();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   async function fetchNotifications() {
@@ -104,10 +103,10 @@ export default function App() {
       setUserName(data.name);
       setMessages([]);
       setNotifications([]);
-      setToast(`Welcome, ${data.name}!`);
+      setToast(`مرحباً ${data.name}!`);
     } catch (e) {
       console.error(e);
-      setLoginError("Invalid username or password");
+      setLoginError("اسم المستخدم أو كلمة المرور غير صحيحة");
     } finally {
       setLoginLoading(false);
     }
@@ -155,7 +154,7 @@ export default function App() {
       }
     } catch (e) {
       console.error(e);
-      setToast("Error contacting backend.");
+      setToast("حدث خطأ أثناء الاتصال بالخادم.");
     } finally {
       setLoading(false);
     }
@@ -188,10 +187,10 @@ export default function App() {
         },
       ]);
 
-      setToast(accepted ? "Action confirmed." : "Action rejected.");
+      setToast(accepted ? "تم تأكيد الإجراء." : "تم رفض الإجراء.");
     } catch (e) {
       console.error(e);
-      setToast("Failed to confirm action.");
+      setToast("فشل تأكيد الإجراء.");
     } finally {
       setActionLoading(false);
       setProposedAction(null);
@@ -205,10 +204,10 @@ export default function App() {
     try {
       await fetch(`${BACKEND_URL}/run_proactive`, { method: "POST" });
       await fetchNotifications();
-      setToast("Proactive engine executed.");
+      setToast("تم تشغيل المحرك الاستباقي.");
     } catch (e) {
       console.error(e);
-      setToast("Proactive engine failed.");
+      setToast("فشل تشغيل المحرك الاستباقي.");
     } finally {
       setProactiveRunning(false);
     }
@@ -238,13 +237,12 @@ export default function App() {
       setInput((prev) => (prev ? prev + " " : "") + text);
     } catch (e) {
       console.error(e);
-      setToast("Failed to transcribe audio.");
+      setToast("فشل تحويل الصوت إلى نص.");
     }
   }
 
   async function toggleRecording() {
     if (isRecording) {
-      // stop recording
       if (mediaRecorderRef.current) {
         mediaRecorderRef.current.stop();
       }
@@ -252,7 +250,6 @@ export default function App() {
       return;
     }
 
-    // start recording
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -276,13 +273,12 @@ export default function App() {
       setIsRecording(true);
     } catch (err) {
       console.error("Mic error", err);
-      setToast("Microphone access denied or unavailable.");
+      setToast("تعذر الوصول إلى الميكروفون.");
     }
   }
 
   async function playMessageAsVoice(text) {
     try {
-      // If something is already playing, stop it first
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
@@ -318,70 +314,67 @@ export default function App() {
         URL.revokeObjectURL(url);
         audioRef.current = null;
         setIsSpeaking(false);
-        setToast("Failed to play audio.");
+        setToast("فشل تشغيل الصوت.");
       };
 
       await audio.play();
     } catch (e) {
       console.error(e);
       setIsSpeaking(false);
-      setToast("Failed to play audio.");
+      setToast("فشل تشغيل الصوت.");
     }
   }
 
-
   // ------------------ RENDER ------------------
 
-
-  // Derive in-app only notifications for the right panel
   const inAppNotifications = notifications.filter(
     (n) => n.channel === "in_app"
   );
 
-  // If not logged in: show login card
+  // If not logged in: show login page
   if (!userId) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg border">
-          <h1 className="text-lg font-semibold mb-1">Absher AI Agent</h1>
+      <div className="min-h-screen flex items-center justify-center bg-slate-100" dir="rtl">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg border text-right">
+          <h1 className="text-lg font-semibold mb-1">مساعد أبشر الذكي</h1>
           <p className="text-xs text-slate-500 mb-4">
-            Mock login – checks credentials from a JSON file in the backend.
+            تسجيل دخول تجريبي – يتم التحقق من البيانات من ملف JSON في الخادم.
           </p>
 
           <form className="space-y-3" onSubmit={handleLogin}>
             <div>
-              <label className="block text-xs mb-1">Username</label>
+              <label className="block text-xs mb-1">اسم المستخدم</label>
               <input
-                className="w-full rounded-xl border px-3 py-2 text-sm bg-slate-50"
+                className="w-full rounded-xl border px-3 py-2 text-sm bg-slate-50 text-right"
                 value={loginUsername}
                 onChange={(e) => setLoginUsername(e.target.value)}
-                placeholder="e.g. abdullah"
+                placeholder="مثال: abdullah"
               />
             </div>
             <div>
-              <label className="block text-xs mb-1">Password</label>
+              <label className="block text-xs mb-1">كلمة المرور</label>
               <input
                 type="password"
-                className="w-full rounded-xl border px-3 py-2 text-sm bg-slate-50"
+                className="w-full rounded-xl border px-3 py-2 text-sm bg-slate-50 text-right"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="e.g. 123456"
+                placeholder="مثال: 123456"
               />
             </div>
             {loginError && (
-              <div className="text-xs text-red-500">{loginError}</div>
+              <div className="text-xs text-red-500 text-right">{loginError}</div>
             )}
             <button
               type="submit"
               disabled={loginLoading}
               className="w-full rounded-xl bg-emerald-600 py-2 text-sm font-medium text-white disabled:opacity-60"
             >
-              {loginLoading ? "Logging in..." : "Login"}
+              {loginLoading ? "جاري تسجيل الدخول..." : "دخول"}
             </button>
           </form>
 
-          <div className="mt-4 text-[11px] text-slate-500">
-            Demo credentials:
+          <div className="mt-4 text-[11px] text-slate-500 text-right">
+            بيانات تسجيل الدخول للتجربة:
             <br />
             <code>abdullah / 123456</code>
             <br />
@@ -392,14 +385,13 @@ export default function App() {
     );
   }
 
-  // Logged in: main UI
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100">
+    <div className="min-h-screen flex flex-col bg-slate-100" dir="rtl">
       <header className="bg-white border-b px-4 py-3 shadow-sm flex justify-between items-center">
-        <div>
-          <h1 className="font-semibold text-slate-900">Absher AI Agent Demo</h1>
+        <div className="text-right">
+          <h1 className="font-semibold text-slate-900">مساعد أبشر الذكي</h1>
           <div className="text-xs text-slate-500">
-            Logged in as {userName} ({userId})
+            تسجيل الدخول باسم {userName} ({userId})
           </div>
         </div>
 
@@ -413,7 +405,7 @@ export default function App() {
               }`}
               onClick={() => setActiveTab("chat")}
             >
-              Chat
+              المحادثة
             </button>
 
             <button
@@ -424,7 +416,7 @@ export default function App() {
               }`}
               onClick={() => setActiveTab("profile")}
             >
-              Profile
+              الملف الشخصي
             </button>
           </div>
 
@@ -437,24 +429,24 @@ export default function App() {
               setNotifications([]);
             }}
           >
-            Logout
+            تسجيل الخروج
           </button>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 gap-4 p-4 md:flex-row flex-col">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 gap-4 p-4 md:flex-row flex-col text-right">
         {activeTab === "chat" && (
           <>
             {/* CHAT SECTION */}
             <section className="flex flex-col flex-1 bg-white rounded-xl p-4 shadow-sm border">
-              <h2 className="text-sm font-semibold mb-2">Chat</h2>
+              <h2 className="text-sm font-semibold mb-2">المحادثة</h2>
 
               <div className="flex-1 overflow-y-auto bg-slate-50 rounded-xl p-3 space-y-2">
                 {messages.map((m) => (
                   <div
                     key={m.id}
                     className={`flex ${
-                      m.from === "user" ? "justify-end" : "justify-start"
+                      m.from === "user" ? "justify-start" : "justify-end"
                     }`}
                   >
                     <div
@@ -468,31 +460,30 @@ export default function App() {
                         <div className="flex-1">
                           {m.text}
                           <div className="text-[10px] opacity-50 mt-1">
-                            {new Date(m.time).toLocaleTimeString()}
+                            {new Date(m.time).toLocaleTimeString("ar")}
                           </div>
                         </div>
 
-                          {m.from === "agent" && (
-                            <button
-                              type="button"
-                              className={`text-[10px] opacity-70 hover:opacity-100 ${
-                                isSpeaking ? "cursor-not-allowed" : ""
-                              }`}
-                              onClick={() => !isSpeaking && playMessageAsVoice(m.text)}
-                              title={isSpeaking ? "Playing audio..." : "Play voice"}
-                            >
-                              {isSpeaking ? "🔊…" : "🔊"}
-                            </button>
-                          )}
-
+                        {m.from === "agent" && (
+                          <button
+                            type="button"
+                            className={`text-[10px] opacity-70 hover:opacity-100 ${
+                              isSpeaking ? "cursor-not-allowed" : ""
+                            }`}
+                            onClick={() => !isSpeaking && playMessageAsVoice(m.text)}
+                            title={isSpeaking ? "جاري التشغيل..." : "تشغيل الصوت"}
+                          >
+                            {isSpeaking ? "🔊…" : "🔊"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
                 ))}
 
                 {loading && (
-                  <div className="text-xs text-slate-500">
-                    Agent is typing…
+                  <div className="text-xs text-slate-500 text-left">
+                    المساعد يكتب…
                   </div>
                 )}
               </div>
@@ -507,32 +498,31 @@ export default function App() {
                       sendMessage();
                     }
                   }}
-                  className="flex-1 h-16 rounded-xl border p-2 bg-slate-50"
-                  placeholder="Type a message… or use the mic 🎙️"
+                  className="flex-1 h-16 rounded-xl border p-2 bg-slate-50 text-right"
+                  placeholder="اكتب رسالة… أو استخدم الميكروفون 🎙️"
                 />
 
-                {/* Mic button */}
                 <button
                   type="button"
                   onClick={toggleRecording}
                   className={`rounded-xl px-3 py-2 text-sm border ${
                     isRecording ? "bg-red-500 text-white" : "bg-white"
                   }`}
-                  title={isRecording ? "Stop recording" : "Start recording"}
+                  title={isRecording ? "إيقاف التسجيل" : "بدء التسجيل"}
                 >
-                  {isRecording ? "Stop" : "🎙️"}
+                  {isRecording ? "إيقاف" : "🎙️"}
                 </button>
 
                 <button
                   onClick={sendMessage}
                   className="bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm"
                 >
-                  Send
+                  إرسال
                 </button>
               </div>
             </section>
 
-            {/* Right Column (SMS + Notifications) */}
+            {/* Right Column */}
             <aside className="flex flex-col gap-4 md:w-80 w-full">
               <SmsPanel
                 notifications={notifications}
@@ -541,7 +531,7 @@ export default function App() {
               />
 
               <div className="flex flex-col flex-1 bg-white rounded-xl p-4 border shadow-sm">
-                <h2 className="text-sm font-semibold">In-App Notifications</h2>
+                <h2 className="text-sm font-semibold">الإشعارات داخل التطبيق</h2>
 
                 <div className="flex-1 overflow-y-auto space-y-2 mt-2">
                   {inAppNotifications.map((n) => (
@@ -554,7 +544,7 @@ export default function App() {
                           {n.channel}
                         </span>
                         <span className="text-[10px]">
-                          {new Date(n.created_at).toLocaleString()}
+                          {new Date(n.created_at).toLocaleString("ar")}
                         </span>
                       </div>
                       <div className="mt-1">{n.message}</div>
@@ -566,7 +556,7 @@ export default function App() {
                   className="text-xs text-emerald-600 mt-2"
                   onClick={fetchNotifications}
                 >
-                  Refresh
+                  تحديث
                 </button>
               </div>
             </aside>
@@ -582,7 +572,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Toast */}
       {toast && (
         <div className="fixed bottom-4 inset-x-0 flex justify-center">
           <div className="bg-slate-900 text-white text-xs px-4 py-2 rounded-full shadow">
@@ -597,7 +586,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Action modal */}
       {proposedAction && (
         <ActionModal
           action={proposedAction}
