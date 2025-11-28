@@ -4,7 +4,7 @@ import SmsPanel from "./components/SmsPanel";
 import ActionModal from "./components/ActionModal";
 import Profile from "./components/Profile";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 const STORAGE_KEY = "absher_demo_user";
 
 export default function App() {

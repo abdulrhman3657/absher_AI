@@ -47,9 +47,10 @@ app = FastAPI(title="Absher Proactive Agent Backend")
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    # during dev you could also use "*" if you want:
-    # "*",
+    "https://absher-ai-1.onrender.com",
 ]
+# origins = ["*"]
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -291,5 +292,9 @@ async def text_to_speech(payload: TextToSpeechRequest):
 
 if __name__ == "__main__":
     import uvicorn
+    import os
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", "8000"))  # Render sets PORT
+
+    # uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
