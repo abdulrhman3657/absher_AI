@@ -1,0 +1,45 @@
+absher_AI/
+│
+├── backend/
+│   ├── config.py 
+│   ├── main.py 
+│   ├── models.py 
+│   ├── store.py 
+│   ├── llm_chat.py 
+│
+│   ├── absher_agent.py     
+│   ├── absher_tools.py        
+│   ├── absher_rag.py       
+│
+│   ├── notification_ai.py 
+│   ├── proactive.py 
+│
+│   ├── knowledge/             
+│   │     └── absher_knowledge.json 
+│
+│   ├── users.json            
+│
+│   └── requirements.txt 
+│
+└── frontend/
+    ├── .gitignore
+    ├── eslint.config.js
+    ├── index.html
+    ├── package-lock.json
+    ├── package.json
+    ├── README.md
+    ├── vite.config.js            
+    ├───public
+    │       vite.svg
+    │       
+    └───src
+        ├── App.jsx
+        ├── index.css
+        ├── main.jsx
+        │   
+        ├───assets
+        │       react.svg
+        │       
+        └───components
+                ActionModal.jsx
+                SmsPanel.jsx

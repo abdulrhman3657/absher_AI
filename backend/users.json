@@ -1,0 +1,49 @@
+[
+  {
+    "id": "user123",
+    "username": "abdullah",
+    "password": "123456",
+    "name": "Abdullah Al Saud",
+    "phone_number": "+966500000000",
+    "services": [
+      {
+        "service_type": "iqama",
+        "service_name": "Iqama",
+        "expiry_date": "2026-12-01T00:00:00Z"
+      },
+      {
+        "service_type": "driver_license",
+        "service_name": "Driver License",
+        "expiry_date": "2026-11-27T21:34:26.991230Z"
+      }
+    ]
+  },
+  {
+    "id": "user456",
+    "username": "fatimah",
+    "password": "password",
+    "name": "Fatimah Al Harbi",
+    "phone_number": "+966511111111",
+    "services": [
+      {
+        "service_type": "passport",
+        "service_name": "Passport",
+        "expiry_date": "2026-06-10T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "id": "user789",
+    "username": "khaled",
+    "password": "123123",
+    "name": "Khaled Al Otaibi",
+    "phone_number": "+966522222222",
+    "services": [
+      {
+        "service_type": "iqama",
+        "service_name": "Iqama",
+        "expiry_date": "2025-01-30T00:00:00Z"
+      }
+    ]
+  }
+]
