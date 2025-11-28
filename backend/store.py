@@ -31,9 +31,10 @@ def _load_users_from_json() -> None:
     with USERS_JSON_PATH.open("r", encoding="utf-8") as f:
         raw_users = json.load(f)
 
-    loaded = {}
+    loaded: Dict[str, User] = {}
     for u in raw_users:
-        loaded[u["id"]] = User(**u)
+        user_obj = User(**u)
+        loaded[user_obj.national_id] = user_obj
 
     USERS = loaded
     print(f"[STORE] Loaded {len(USERS)} users from {USERS_JSON_PATH}")
@@ -110,19 +111,21 @@ def _save_users_to_json() -> None:
 
     for user in USERS.values():
         u = user.model_dump()
-        # make sure datetimes are ISO strings with Z
-        for svc in u["services"]:
-            if isinstance(svc["expiry_date"], datetime):
-                svc["expiry_date"] = (
-                    svc["expiry_date"]
-                    .astimezone(timezone.utc)
+        # ensure datetime -> ISO strings
+        services = u.get("services") or {}
+        for key, value in services.items():
+            if isinstance(value, datetime):
+                services[key] = (
+                    value.astimezone(timezone.utc)
                     .isoformat()
                     .replace("+00:00", "Z")
                 )
+        u["services"] = services
         data.append(u)
 
     with USERS_JSON_PATH.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+
     print(f"[STORE] Saved {len(USERS)} users to {USERS_JSON_PATH}")
 
 

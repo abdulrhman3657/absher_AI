@@ -5,6 +5,12 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+class ServicesExpiry(BaseModel):
+    driver_license_expire_date: Optional[datetime] = None
+    vehicle_registration_expire_date: Optional[datetime] = None
+    passport_expire_date: Optional[datetime] = None
+    national_id_expire_date: Optional[datetime] = None
+
 
 # ---------- Core domain models ----------
 
@@ -23,12 +29,13 @@ class UserService(BaseModel):
 
 
 class User(BaseModel):
-    id: str
-    username: str          # mock login username
-    password: str          # mock login password
+    national_id: str           # primary key now
+    username: str              # mock login username
+    password: str              # mock login password
     name: str
     phone_number: str
-    services: List[UserService]
+    services: ServicesExpiry
+
 
 
 class Notification(BaseModel):

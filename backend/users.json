@@ -1,35 +1,41 @@
 [
   {
-    "id": "user123",
+    "national_id": "1191679034",
     "username": "abdullah",
     "password": "123456",
     "name": "Abdullah Al Saud",
     "phone_number": "+966500000000",
-    "services": [
-      {
-        "service_type": "national_id",
-        "service_name": "National ID",
-        "expiry_date": "2026-12-01T00:00:00Z"
-      },
-      {
-        "service_type": "driver_license",
-        "service_name": "Driver License",
-        "expiry_date": "2026-11-27T21:34:26.991230Z"
-      }
-    ]
+    "services": {
+      "driver_license_expire_date": "2026-11-27T21:34:26.991230Z",
+      "vehicle_registration_expire_date": null,
+      "passport_expire_date": null,
+      "national_id_expire_date": "2026-12-01T00:00:00Z"
+    }
   },
   {
-    "id": "user789",
+    "national_id": "1112345667",
+    "username": "fatimah",
+    "password": "password",
+    "name": "Fatimah Al Harbi",
+    "phone_number": "+966511111111",
+    "services": {
+      "driver_license_expire_date": null,
+      "vehicle_registration_expire_date": null,
+      "passport_expire_date": "2026-06-10T00:00:00Z",
+      "national_id_expire_date": "2025-01-30T00:00:00Z"
+    }
+  },
+  {
+    "national_id": "2222345667",
     "username": "khaled",
     "password": "123123",
     "name": "Khaled Al Otaibi",
     "phone_number": "+966522222222",
-    "services": [
-      {
-        "service_type": "national_id",
-        "service_name": "National ID",
-        "expiry_date": "2025-01-30T00:00:00Z"
-      }
-    ]
+    "services": {
+      "driver_license_expire_date": null,
+      "vehicle_registration_expire_date": null,
+      "passport_expire_date": null,
+      "national_id_expire_date": "2025-01-30T00:00:00Z"
+    }
   }
 ]
