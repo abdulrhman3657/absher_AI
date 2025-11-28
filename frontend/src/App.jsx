@@ -332,6 +332,12 @@ export default function App() {
 
   // ------------------ RENDER ------------------
 
+
+  // Derive in-app only notifications for the right panel
+  const inAppNotifications = notifications.filter(
+    (n) => n.channel === "in_app"
+  );
+
   // If not logged in: show login card
   if (!userId) {
     return (
@@ -535,10 +541,10 @@ export default function App() {
               />
 
               <div className="flex flex-col flex-1 bg-white rounded-xl p-4 border shadow-sm">
-                <h2 className="text-sm font-semibold">All Notifications</h2>
+                <h2 className="text-sm font-semibold">In-App Notifications</h2>
 
                 <div className="flex-1 overflow-y-auto space-y-2 mt-2">
-                  {notifications.map((n) => (
+                  {inAppNotifications.map((n) => (
                     <div
                       key={n.id}
                       className="bg-slate-50 p-2 rounded-xl border text-xs"
