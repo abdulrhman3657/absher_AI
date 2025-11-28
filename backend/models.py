@@ -100,5 +100,5 @@ class LoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    user_id: str
+    user_id: str   # this will hold the national_id value
     name: str

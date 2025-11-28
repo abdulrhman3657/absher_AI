@@ -81,16 +81,10 @@ async def health() -> Dict[str, str]:
 
 @app.post("/login", response_model=LoginResponse)
 async def login(payload: LoginRequest) -> LoginResponse:
-    """
-    Mock login that checks credentials against users loaded from users.json.
-    Also (in the background) triggers an AI-generated in-app notification
-    summarizing the user's status.
-    """
     user = get_user_by_username(payload.username)
     if not user or user.password != payload.password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # 🔹 Fire-and-forget background task so login is not blocked by OpenAI
     async def _create_login_notification(u_id: str):
         try:
             user_obj = USERS.get(u_id)
@@ -99,23 +93,19 @@ async def login(payload: LoginRequest) -> LoginResponse:
             in_app_msg, sms_msg = await generate_login_summary_messages(user_obj)
 
             add_notification(
-                user_id=user_obj.id,
+                user_id=user_obj.national_id,   # or u_id if it's already national_id
                 channel="in_app",
                 message=in_app_msg,
-                meta={
-                    "source": "login_summary",
-                },
+                meta={"source": "login_summary"},
             )
-            print(f"[LOGIN] Created in-app login summary notification for {user_obj.id}")
         except Exception as e:
-            # Don't break login if AI fails
             print(f"[LOGIN] Failed to generate login summary notification: {e}")
 
-    asyncio.create_task(_create_login_notification(user.id))
+    # IMPORTANT: here we pass the national_id as user_id
+    asyncio.create_task(_create_login_notification(user.national_id))
 
-    # ✅ Immediately return login response (no waiting on AI)
     return LoginResponse(
-        user_id=user.id,
+        user_id=user.national_id,
         name=user.name,
     )
 

@@ -34,7 +34,7 @@ def _load_users_from_json() -> None:
     loaded: Dict[str, User] = {}
     for u in raw_users:
         user_obj = User(**u)
-        loaded[user_obj.national_id] = user_obj
+        loaded[user_obj.national_id] = user_obj # key is national_id
 
     USERS = loaded
     print(f"[STORE] Loaded {len(USERS)} users from {USERS_JSON_PATH}")
