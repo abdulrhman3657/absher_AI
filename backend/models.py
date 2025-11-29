@@ -102,3 +102,23 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     user_id: str   # this will hold the national_id value
     name: str
+
+class PaymentRequest(BaseModel):
+    user_id: str
+    action_id: str
+    amount: float
+    currency: str = "SAR"
+
+    card_holder: str
+    card_number: str
+    expiry_month: str
+    expiry_year: str
+    cvv: str
+
+
+class PaymentResponse(BaseModel):
+    status: Literal["success", "failed"]
+    transaction_id: Optional[str] = None
+    failure_reason: Optional[str] = None
+    amount: float
+    currency: str

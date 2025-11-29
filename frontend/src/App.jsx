@@ -160,18 +160,67 @@ export default function App() {
     }
   }
 
-  async function confirmAction(accepted) {
-    if (!userId || !proposedAction) return;
+async function confirmAction(accepted, paymentData) {
+  if (!userId || !proposedAction) return;
 
-    setActionLoading(true);
-    try {
+  setActionLoading(true);
+  try {
+    if (!accepted) {
+      // User rejected → no payment, just notify backend
       const res = await fetch(`${BACKEND_URL}/confirm-action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: userId,
           action_id: proposedAction.id,
-          accepted,
+          accepted: false,
+        }),
+      });
+
+      const data = await res.json();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 2,
+          from: "agent",
+          text: data.detail,
+          time: new Date().toISOString(),
+        },
+      ]);
+      setToast("تم رفض الإجراء.");
+    } else {
+      // 1) Call payment API
+      const amount = proposedAction.data?.amount;
+      const currency = proposedAction.data?.currency || "SAR";
+
+      const payRes = await fetch(`${BACKEND_URL}/payment/charge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          action_id: proposedAction.id,
+          amount,
+          currency,
+          ...paymentData,
+        }),
+      });
+
+      const payData = await payRes.json();
+
+      if (!payRes.ok || payData.status !== "success") {
+        setToast(payData.failure_reason || "فشل الدفع.");
+        setActionLoading(false);
+        return;
+      }
+
+      // 2) Payment OK → confirm action (renew services)
+      const res = await fetch(`${BACKEND_URL}/confirm-action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          action_id: proposedAction.id,
+          accepted: true,
         }),
       });
 
@@ -187,15 +236,18 @@ export default function App() {
         },
       ]);
 
-      setToast(accepted ? "تم تأكيد الإجراء." : "تم رفض الإجراء.");
-    } catch (e) {
-      console.error(e);
-      setToast("فشل تأكيد الإجراء.");
-    } finally {
-      setActionLoading(false);
-      setProposedAction(null);
+      setToast("تم الدفع وتجديد الخدمة بنجاح.");
+      // Optionally refresh notifications to show updated expiry
+      fetchNotifications();
     }
+  } catch (e) {
+    console.error(e);
+    setToast("فشل معالجة الإجراء.");
+  } finally {
+    setActionLoading(false);
+    setProposedAction(null);
   }
+}
 
   async function runProactive() {
     if (!userId) return;

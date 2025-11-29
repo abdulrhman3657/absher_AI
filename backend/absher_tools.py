@@ -41,18 +41,6 @@ class SubmitRenewalInput(BaseModel):
         "vehicle_registration",
     ] = Field(..., description="Which service to renew.")
 
-    requires_payment: bool = Field(
-        True,
-        description="True if a payment will be processed with this renewal.",
-    )
-    amount: float = Field(
-        ...,
-        description="Payment amount in SAR.",
-    )
-    currency: str = Field(
-        "SAR",
-        description="Currency code, usually SAR.",
-    )
     reason: str = Field(
         ...,
         description="Short explanation for the UI (what will happen and why).",
@@ -62,19 +50,20 @@ class SubmitRenewalInput(BaseModel):
 def submit_renewal_request_tool(
     user_id: str,
     service_type: str,
-    requires_payment: bool = True,
-    amount: float = 0.0,
-    currency: str = "SAR",
-    reason: str = "",
+    reason: str,
 ) -> Dict[str, Any]:
     """
-    This tool DOES NOT actually renew or charge.
+    SAFE TOOL: only signals intent to renew a service.
 
-    It only packages the renewal intent + payment details so:
-    - The agent can reason about success/failure.
-    - The backend can later map this call to a ProposedAction + popup.
+    It does NOT:
+    - choose amounts
+    - handle payment
+    - mark anything as renewed
 
-    The real renewal & payment happen only after /confirm-action.
+    The backend and UI will:
+    - look up the official price for this service
+    - ask the user for payment details
+    - then, if successful, call /confirm-action.
     """
     user: User | None = USERS.get(user_id)
     if not user:
@@ -88,8 +77,5 @@ def submit_renewal_request_tool(
         "ok": True,
         "user_id": user_id,
         "service_type": service_type,
-        "requires_payment": requires_payment,
-        "amount": amount,
-        "currency": currency,
         "reason": reason,
     }

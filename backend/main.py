@@ -18,9 +18,13 @@ from models import (
     LoginRequest,
     LoginResponse,
     TextToSpeechRequest,
+    PaymentRequest,
+    PaymentResponse,
 )
 from proactive import run_proactive_engine, start_scheduler
 from notification_ai import generate_login_summary_messages
+
+import uuid
 
 from store import (
     USERS,
@@ -31,6 +35,14 @@ from store import (
     add_notification,
     create_session_user_from_template,
 )
+
+
+SERVICE_NAME_AR = {
+    "National ID": "الهوية الوطنية",
+    "Driver License": "رخصة القيادة",
+    "Vehicle Registration": "استمارة المركبة",
+    "Passport": "جواز السفر",
+}
 
 
 # -------------------------------------------------------------------
@@ -168,36 +180,43 @@ async def list_notifications(user_id: str) -> List[NotificationOut]:
 async def confirm_action(payload: ConfirmActionRequest) -> ConfirmActionResponse:
     """
     Confirm or reject an action proposed by the agent.
-    Now it actually renews expiring services for the *session* user.
+    Now it actually renews expiring services for the user,
+    and returns a user-friendly Arabic message.
     """
     user = USERS.get(payload.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     if payload.accepted:
-        renewed = renew_expiring_services_for_user(payload.user_id)
+        renewed = renew_expiring_services_for_user(user_id=payload.user_id)
 
         if renewed:
-            services_str = ", ".join(
-                f"{svc.service_name} (new expiry {svc.expiry_date.date()})"
-                for svc in renewed
-            )
-            detail = (
-                f"Action {payload.action_id} accepted. "
-                f"The following services were renewed: {services_str}."
-            )
+            # Build nice Arabic list of renewed services
+            parts = []
+            for svc in renewed:
+                name_en = svc.service_name
+                name_ar = SERVICE_NAME_AR.get(name_en, name_en)
+                date_str = svc.expiry_date.date().isoformat()
+                parts.append(f"{name_ar} (تاريخ الانتهاء الجديد {date_str})")
+
+            services_str = "، ".join(parts)
+
+            detail = f"تم الدفع وتجديد الخدمات التالية بنجاح: {services_str}."
         else:
             detail = (
-                f"Action {payload.action_id} accepted, "
-                "but no expiring services were found to renew."
+                "تم تأكيد الطلب، ولكن لا توجد خدمات منتهية أو قريبة الانتهاء "
+                "ليتم تجديدها حالياً."
             )
         status = "accepted"
     else:
-        detail = f"Action {payload.action_id} rejected by user."
+        detail = "تم إلغاء طلب تجديد الخدمة بناءً على اختيارك."
         status = "rejected"
 
-    print(f"[ACTION] {status.upper()}: {detail}")
+    # Keep a technical log in the backend only
+    print(f"[ACTION] {status.upper()} for user {user.national_id}: {detail}")
+
     return ConfirmActionResponse(status=status, detail=detail)
+
 
 
 @app.post("/run_proactive", response_model=List[NotificationOut])
@@ -273,6 +292,28 @@ async def text_to_speech(payload: TextToSpeechRequest):
     except Exception as e:
         print("[VOICE] TTS error:", e)
         raise HTTPException(status_code=500, detail="TTS failed")
+    
+
+@app.post("/payment/charge", response_model=PaymentResponse)
+async def charge_payment(payload: PaymentRequest) -> PaymentResponse:
+    """
+    Demo payment endpoint.
+    Always returns success — no validation, no failures.
+    """
+    tx_id = str(uuid.uuid4())
+
+    print(
+        f"[PAYMENT] Demo success: user={payload.user_id}, "
+        f"action={payload.action_id}, amount={payload.amount} {payload.currency}, tx={tx_id}"
+    )
+
+    return PaymentResponse(
+        status="success",
+        transaction_id=tx_id,
+        amount=payload.amount,
+        currency=payload.currency,
+    )
+
 
 
 # -------------------------------------------------------------------

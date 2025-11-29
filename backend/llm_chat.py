@@ -11,6 +11,8 @@ from models import (
 )
 from absher_agent import build_absher_agent
 
+from pricing import get_service_fee
+
 # Simple in-memory cache of agents per session user (for demo)
 # Keyed by session_id (the user_id used by the frontend/backend APIs)
 _AGENTS: Dict[str, Any] = {}
@@ -85,31 +87,23 @@ def build_services_status(user: User) -> str:
 def _proposed_action_from_tool_input(tool_input: dict) -> ProposedAction:
     """
     Convert submit_renewal_request tool_input into ProposedAction.
-    tool_input will look like:
-      {
-        "user_id": "<session_id>",
-        "service_type": "national_id",
-        "requires_payment": true,
-        "amount": 150.0,
-        "currency": "SAR",
-        "reason": "Renew iqama with payment of 150 SAR"
-      }
+    Tool no longer contains payment fields; we compute them here
+    using the official pricing API.
     """
     service_type = tool_input.get("service_type")
-    requires_payment = bool(tool_input.get("requires_payment", False))
-    amount = tool_input.get("amount")
-    currency = tool_input.get("currency", "SAR")
     reason = tool_input.get("reason", "Renew the selected service.")
 
+    # 🔹 Fetch official price (no LLM guesses)
+    amount = get_service_fee(service_type)
+    currency = "SAR"
     action_type = f"renew_{service_type}" if service_type else "renew_unknown"
 
     return ProposedAction(
         id=str(uuid.uuid4()),
         type=action_type,
-        description=reason,
+        description=f"{reason} (الرسوم {amount} {currency})",
         data={
             "service_type": service_type,
-            "requires_payment": requires_payment,
             "amount": amount,
             "currency": currency,
         },
