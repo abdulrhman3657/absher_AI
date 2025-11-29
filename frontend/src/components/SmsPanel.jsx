@@ -4,7 +4,7 @@ export default function SmsPanel({ notifications, onRunProactive, running }) {
   return (
     <div className="flex h-full flex-col rounded-2xl border bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">الرسائل النصية (تجريبي)</h2>
+        <h2 className="text-sm font-semibold">الرسائل النصية </h2>
 
         <button
           onClick={onRunProactive}

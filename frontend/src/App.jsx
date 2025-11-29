@@ -338,7 +338,7 @@ export default function App() {
         <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg border text-right">
           <h1 className="text-lg font-semibold mb-1">مساعد أبشر الذكي</h1>
           <p className="text-xs text-slate-500 mb-4">
-            تسجيل دخول تجريبي – يتم التحقق من البيانات من ملف JSON في الخادم.
+            تسجيل دخول  – يتم التحقق من البيانات من ملف JSON في الخادم.
           </p>
 
           <form className="space-y-3" onSubmit={handleLogin}>

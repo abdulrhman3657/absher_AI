@@ -13,7 +13,7 @@ export default function ActionModal({ action, loading, onConfirm, onClose }) {
         </p>
 
         <p className="mb-6 text-xs text-slate-500">
-          هذا مجرد نموذج تجريبي. عند التأكيد سيتم تنفيذ عملية وهمية من جهة الخادم.
+          هذا مجرد نموذج . عند التأكيد سيتم تنفيذ عملية وهمية من جهة الخادم.
         </p>
 
         <div className="flex justify-end gap-3">
