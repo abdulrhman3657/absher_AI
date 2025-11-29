@@ -379,6 +379,8 @@ export default function App() {
             <code>abdullah / 123456</code>
             <br />
             <code>fatimah / password</code>
+            <br />
+            <code>khaled / 123123</code>
           </div>
         </div>
       </div>
