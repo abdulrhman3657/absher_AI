@@ -1,6 +1,7 @@
-# store.py
+# backend/store.py
 import json
 import uuid
+from copy import deepcopy
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -10,19 +11,24 @@ from langchain_community.vectorstores import FAISS
 from config import embeddings
 from models import Notification, User, UserService, ServiceType
 
-# In-memory users + notifications
+# In-memory session users + notifications
+# USERS is keyed by a session_id (random UUID per login)
 USERS: Dict[str, User] = {}
+
+# Template users loaded from users.json (keyed by national_id)
+TEMPLATE_USERS: Dict[str, User] = {}
+
 NOTIFICATIONS: List[Notification] = []
 
-# FAISS index per user (for fuzzy notification search)
+# FAISS index per session user (for fuzzy notification search)
 USER_NOTIFICATION_INDEX: Dict[str, FAISS] = {}
 
 USERS_JSON_PATH = Path(__file__).with_name("users.json")
 
 
 def _load_users_from_json() -> None:
-    """Load users from backend/users.json at startup."""
-    global USERS
+    """Load template users from backend/users.json at startup."""
+    global TEMPLATE_USERS
 
     with USERS_JSON_PATH.open("r", encoding="utf-8") as f:
         raw_users = json.load(f)
@@ -33,16 +39,28 @@ def _load_users_from_json() -> None:
         # key is national_id
         loaded[user_obj.national_id] = user_obj
 
-    USERS = loaded
-    print(f"[STORE] Loaded {len(USERS)} users from {USERS_JSON_PATH}")
+    TEMPLATE_USERS = loaded
+    print(f"[STORE] Loaded {len(TEMPLATE_USERS)} template users from {USERS_JSON_PATH}")
 
 
 _load_users_from_json()
 
 
+def create_session_user_from_template(template: User) -> str:
+    """
+    Clone a template user into a new in-memory session user.
+    Returns the new session_id (used as user_id in APIs).
+    """
+    session_id = str(uuid.uuid4())
+    user_copy = deepcopy(template)
+    USERS[session_id] = user_copy
+    print(f"[STORE] Created session user {session_id} from template {template.national_id}")
+    return session_id
+
+
 def get_user_by_username(username: str) -> Optional[User]:
-    """Find user by username (for login)."""
-    for u in USERS.values():
+    """Find template user by username (for login)."""
+    for u in TEMPLATE_USERS.values():
         if u.username == username:
             return u
     return None
@@ -106,6 +124,9 @@ def add_notification(
     message: str,
     meta: Optional[Dict] = None,
 ) -> Notification:
+    """
+    user_id here is the session_id for the logged-in user.
+    """
     notif = Notification(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -125,7 +146,7 @@ def get_user_notifications(user_id: str) -> List[Notification]:
 
 
 def _update_user_notification_index(user_id: str) -> None:
-    """Rebuild vector index for a user's notifications."""
+    """Rebuild vector index for a session user's notifications."""
     user_notifs = get_user_notifications(user_id)
     if not user_notifs:
         USER_NOTIFICATION_INDEX.pop(user_id, None)
@@ -153,39 +174,16 @@ def search_notifications(user_id: str, query: str, k: int = 3) -> List[Notificat
     return [n for n in NOTIFICATIONS if n.id in notif_ids]
 
 
-def _save_users_to_json() -> None:
-    """Persist current USERS dict back to users.json."""
-    data = []
-
-    for user in USERS.values():
-        u = user.model_dump()
-        # ensure datetime -> ISO strings
-        services = u.get("services") or {}
-        for key, value in services.items():
-            if isinstance(value, datetime):
-                services[key] = (
-                    value.astimezone(timezone.utc)
-                    .isoformat()
-                    .replace("+00:00", "Z")
-                )
-        u["services"] = services
-        data.append(u)
-
-    with USERS_JSON_PATH.open("w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-    print(f"[STORE] Saved {len(USERS)} users to {USERS_JSON_PATH}")
-
-
 def renew_expiring_services_for_user(
     user_id: str,
     threshold_days: int = 3,
 ) -> List[UserService]:
     """
-    Renew all services for this user that are expiring in <= threshold_days.
+    Renew all services for this session user that are expiring in <= threshold_days.
     For demo we extend each by 1 year from the later of now/expiry.
 
     Returns a list of UserService objects with the NEW expiry dates.
+    Changes are in-memory only (not persisted to users.json).
     """
     user = USERS.get(user_id)
     if not user:
@@ -216,7 +214,5 @@ def renew_expiring_services_for_user(
 
             renewed.append(svc)
 
-    if renewed:
-        _save_users_to_json()
-
+    # No persistence: each browser session gets its own sandbox copy.
     return renewed

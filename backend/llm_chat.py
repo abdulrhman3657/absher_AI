@@ -11,15 +11,16 @@ from models import (
 )
 from absher_agent import build_absher_agent
 
-# Simple in-memory cache of agents per user (for demo)
+# Simple in-memory cache of agents per session user (for demo)
+# Keyed by session_id (the user_id used by the frontend/backend APIs)
 _AGENTS: Dict[str, Any] = {}
 
 
-def _get_agent_for_user(user_id: str):
-    agent = _AGENTS.get(user_id)
+def _get_agent_for_user(session_id: str):
+    agent = _AGENTS.get(session_id)
     if agent is None:
         agent = build_absher_agent()
-        _AGENTS[user_id] = agent
+        _AGENTS[session_id] = agent
     return agent
 
 
@@ -37,12 +38,6 @@ def build_notifications_context(notifs: List[Notification]) -> str:
             f"- [{n.created_at.isoformat()}] via {n.channel.upper()}: {n.message}"
         )
     return "\n".join(lines)
-
-
-from datetime import datetime, timezone
-from typing import Optional
-
-from models import User  # adjust import if needed
 
 
 def build_services_status(user: User) -> str:
@@ -83,7 +78,6 @@ def build_services_status(user: User) -> str:
     return "\n".join(lines) if lines else "User has no registered services."
 
 
-
 # ==========================================================
 # TOOL -> ProposedAction mapping
 # ==========================================================
@@ -93,7 +87,7 @@ def _proposed_action_from_tool_input(tool_input: dict) -> ProposedAction:
     Convert submit_renewal_request tool_input into ProposedAction.
     tool_input will look like:
       {
-        "user_id": "user123",
+        "user_id": "<session_id>",
         "service_type": "national_id",
         "requires_payment": true,
         "amount": 150.0,
@@ -128,12 +122,15 @@ def _proposed_action_from_tool_input(tool_input: dict) -> ProposedAction:
 
 async def handle_chat(
     user: User,
+    session_id: str,
     message: str,
     notifications: List[Notification],
 ) -> ChatResponse:
     """
     Use the AbsherAgent (AgentType.OPENAI_FUNCTIONS) with tools + memory.
     Extract any submit_renewal_request tool call as a ProposedAction for the UI popup.
+
+    session_id is the internal user_id used by tools such as submit_renewal_request.
     """
     notifications_context = build_notifications_context(notifications)
     services_status = build_services_status(user)
@@ -141,7 +138,8 @@ async def handle_chat(
     # This is the text the agent sees as "input"
     # The SYSTEM_PROMPT in absher_agent.py explains how to interpret this.
     agent_input = f"""
-User id: {user.national_id}
+Internal user_id (for tools): {session_id}
+National ID: {user.national_id}
 User name: {user.name}
 
 Current services status (SOURCE OF TRUTH):
@@ -154,12 +152,10 @@ User message:
 {message}
 """.strip()
 
-    agent = _get_agent_for_user(user.national_id)
+    agent = _get_agent_for_user(session_id)
 
     # AgentExecutor from initialize_agent (with return_intermediate_steps=True)
-    # is synchronous; we wrap it in a thread if we want true async later,
-    # but for now we call it directly (FastAPI will handle the async boundary).
-    # If you want to avoid blocking, you can use run_in_threadpool.
+    # is synchronous; we call it directly.
     result = agent({"input": agent_input})
 
     reply_text: str = result.get("output", "")

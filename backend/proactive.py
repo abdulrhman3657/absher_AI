@@ -27,13 +27,15 @@ def _describe_service_status(svc: UserService, now: datetime) -> str:
 
 async def run_proactive_engine() -> List[Notification]:
     """
-    Scan users and generate proactive SMS notifications using the notification LLM.
+    Scan session users and generate proactive SMS notifications using the notification LLM.
     This is async because it awaits the OpenAI LLM.
+
+    Each logged-in browser session gets its own notifications and SMS messages.
     """
     created: List[Notification] = []
     now = datetime.now(timezone.utc)
 
-    for user in USERS.values():
+    for session_id, user in USERS.items():
         # Use logical service objects instead of ServicesExpiry
         for svc in iter_user_services(user):
             days_left = (svc.expiry_date - now).days
@@ -42,7 +44,7 @@ async def run_proactive_engine() -> List[Notification]:
                 # Check if we already sent an SMS recently for this service
                 existing = [
                     n
-                    for n in get_user_notifications(user.national_id)
+                    for n in get_user_notifications(session_id)
                     if n.channel == "sms"
                     and n.meta.get("service_type") == svc.service_type
                     and (now - n.created_at).days < 7
@@ -61,7 +63,7 @@ async def run_proactive_engine() -> List[Notification]:
                 )
 
                 notif = add_notification(
-                    user_id=user.national_id,
+                    user_id=session_id,
                     channel="sms",
                     message=sms_text,
                     meta={
