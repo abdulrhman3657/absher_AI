@@ -62,8 +62,8 @@ class SubmitRenewalInput(BaseModel):
 def submit_renewal_request_tool(
     user_id: str,
     service_type: str,
-    requires_payment: bool,
-    amount: float,
+    requires_payment: bool = True,
+    amount: float = 0.0,
     currency: str = "SAR",
     reason: str = "",
 ) -> Dict[str, Any]:
