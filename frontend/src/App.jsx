@@ -427,13 +427,11 @@ async function confirmAction(accepted, paymentData) {
 
           <div className="mt-4 text-[11px] text-slate-500 text-right">
             بيانات تسجيل الدخول للتجربة:
-            <br />
-            <code>abdullah / 123456</code>
-            <br />
-            <code>fatimah / password</code>
-            <br />
-            <code>khaled / 123123</code>
+            <div className="flex gap-4"><pre className="font-mono">abdullah </pre> <pre>123456</pre> </div>
+            <div className="flex gap-4"><pre className="font-mono">fatimah </pre> <pre>password</pre></div>
+            <div className="flex gap-4"><pre className="font-mono">khaled </pre> <pre>123123</pre>  </div>
           </div>
+          
         </div>
       </div>
     );
