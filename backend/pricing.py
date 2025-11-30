@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Mapping
 
 ServiceTypeLiteral = Literal[
     "national_id",
@@ -8,12 +8,13 @@ ServiceTypeLiteral = Literal[
 ]
 
 # In a real system this could call another Absher microservice.
-SERVICE_FEES = {
+SERVICE_FEES: Mapping[ServiceTypeLiteral, float] = {
     "national_id": 150.0,
     "driver_license": 80.0,
     "passport": 164.0,
     "vehicle_registration": 100.0,
 }
+
 
 def get_service_fee(service_type: ServiceTypeLiteral) -> float:
     """

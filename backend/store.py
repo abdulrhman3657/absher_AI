@@ -1,15 +1,14 @@
-# backend/store.py
 import json
 import uuid
 from copy import deepcopy
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from langchain_community.vectorstores import FAISS
 
 from config import embeddings
-from models import Notification, User, UserService, ServiceType
+from models import Notification, ServiceType, User, UserService
 
 # In-memory session users + notifications
 # USERS is keyed by a session_id (random UUID per login)
@@ -27,16 +26,18 @@ USERS_JSON_PATH = Path(__file__).with_name("users.json")
 
 
 def _load_users_from_json() -> None:
-    """Load template users from backend/users.json at startup."""
+    """
+    Load template users from backend/users.json at startup into TEMPLATE_USERS.
+    Keyed by national_id.
+    """
     global TEMPLATE_USERS
 
     with USERS_JSON_PATH.open("r", encoding="utf-8") as f:
         raw_users = json.load(f)
 
     loaded: Dict[str, User] = {}
-    for u in raw_users:
-        user_obj = User(**u)
-        # key is national_id
+    for user_data in raw_users:
+        user_obj = User(**user_data)
         loaded[user_obj.national_id] = user_obj
 
     TEMPLATE_USERS = loaded
@@ -59,19 +60,22 @@ def create_session_user_from_template(template: User) -> str:
 
 
 def get_user_by_username(username: str) -> Optional[User]:
-    """Find template user by username (for login)."""
-    for u in TEMPLATE_USERS.values():
-        if u.username == username:
-            return u
+    """
+    Find template user by username (for login).
+    """
+    for user in TEMPLATE_USERS.values():
+        if user.username == username:
+            return user
     return None
 
 
 # ---------------- Services helper ----------------
 
+
 def iter_user_services(user: User) -> List[UserService]:
     """
     Convert the user's ServicesExpiry (user.services) into a list of
-    UserService objects. This gives us a uniform iterable representation
+    UserService objects. This gives a uniform iterable representation
     for proactive checks and renewals.
     """
     s = user.services
@@ -118,6 +122,7 @@ def iter_user_services(user: User) -> List[UserService]:
 
 # ---------------- Notifications ----------------
 
+
 def add_notification(
     user_id: str,
     channel: str,
@@ -125,7 +130,7 @@ def add_notification(
     meta: Optional[Dict] = None,
 ) -> Notification:
     """
-    user_id here is the session_id for the logged-in user.
+    Create and store a new notification for a session user.
     """
     notif = Notification(
         id=str(uuid.uuid4()),
@@ -142,11 +147,16 @@ def add_notification(
 
 
 def get_user_notifications(user_id: str) -> List[Notification]:
+    """
+    Return all notifications for a specific session user.
+    """
     return [n for n in NOTIFICATIONS if n.user_id == user_id]
 
 
 def _update_user_notification_index(user_id: str) -> None:
-    """Rebuild vector index for a session user's notifications."""
+    """
+    Rebuild vector index for a session user's notifications.
+    """
     user_notifs = get_user_notifications(user_id)
     if not user_notifs:
         USER_NOTIFICATION_INDEX.pop(user_id, None)
@@ -163,8 +173,10 @@ def _update_user_notification_index(user_id: str) -> None:
     USER_NOTIFICATION_INDEX[user_id] = index
 
 
-# Fuzzy notification search
 def search_notifications(user_id: str, query: str, k: int = 3) -> List[Notification]:
+    """
+    Fuzzy semantic search over notifications for a single user.
+    """
     index = USER_NOTIFICATION_INDEX.get(user_id)
     if index is None:
         return []
@@ -192,27 +204,24 @@ def renew_expiring_services_for_user(
     now = datetime.now(timezone.utc)
     renewed: List[UserService] = []
 
-    # Work with logical UserService objects
-    services = iter_user_services(user)
-
-    for svc in services:
+    for svc in iter_user_services(user):
         days_left = (svc.expiry_date - now).days
-        if days_left <= threshold_days:
-            base = max(now, svc.expiry_date)
-            new_expiry = base + timedelta(days=365)
-            svc.expiry_date = new_expiry
+        if days_left > threshold_days:
+            continue
 
-            # Write back into the underlying ServicesExpiry on the user
-            if svc.service_type == ServiceType.NATIONAL_ID:
-                user.services.national_id_expire_date = new_expiry
-            elif svc.service_type == ServiceType.LICENSE:
-                user.services.driver_license_expire_date = new_expiry
-            elif svc.service_type == ServiceType.VEHICLE:
-                user.services.vehicle_registration_expire_date = new_expiry
-            elif svc.service_type == ServiceType.PASSPORT:
-                user.services.passport_expire_date = new_expiry
+        base = max(now, svc.expiry_date)
+        new_expiry = base + timedelta(days=365)
+        svc.expiry_date = new_expiry
 
-            renewed.append(svc)
+        if svc.service_type == ServiceType.NATIONAL_ID:
+            user.services.national_id_expire_date = new_expiry
+        elif svc.service_type == ServiceType.LICENSE:
+            user.services.driver_license_expire_date = new_expiry
+        elif svc.service_type == ServiceType.VEHICLE:
+            user.services.vehicle_registration_expire_date = new_expiry
+        elif svc.service_type == ServiceType.PASSPORT:
+            user.services.passport_expire_date = new_expiry
 
-    # No persistence: each browser session gets its own sandbox copy.
+        renewed.append(svc)
+
     return renewed

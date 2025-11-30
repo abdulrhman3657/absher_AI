@@ -1,15 +1,15 @@
-# config.py
 import os
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from openai import OpenAI  # NEW
+from openai import OpenAI
 
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise RuntimeError("Please set OPENAI_API_KEY environment variable.")
+
 
 # -------------------------------
 # LLM 1: Main chat / service tools
@@ -27,7 +27,9 @@ notification_llm = ChatOpenAI(
     temperature=0.0,
 )
 
+# -------------------------------
 # Embeddings for FAISS
+# -------------------------------
 embeddings = OpenAIEmbeddings(
     model="text-embedding-3-small",
 )

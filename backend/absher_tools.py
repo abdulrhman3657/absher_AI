@@ -1,17 +1,20 @@
-# backend/absher_tools.py
-from typing import Dict, Any, Literal
+from typing import Any, Dict, Literal
 
 from pydantic import BaseModel, Field
 
 from absher_rag import search_absher_docs
-from store import USERS
 from models import ServiceType, User
+from store import USERS
 
 
 # ---------- Tool 1: RAG over Absher docs ----------
 
+
 class SearchAbsherDocsInput(BaseModel):
-    query: str = Field(..., description="User question about how Absher services work.")
+    query: str = Field(
+        ...,
+        description="User question about how Absher services work.",
+    )
     k: int = Field(
         4,
         ge=1,
@@ -22,17 +25,18 @@ class SearchAbsherDocsInput(BaseModel):
 
 def search_absher_docs_tool(query: str, k: int = 4) -> str:
     """
-    Simple wrapper around the RAG function.
+    Simple wrapper around the RAG search function.
     """
     return search_absher_docs(query=query, k=int(k))
 
 
 # ---------- Tool 2: submit_renewal_request (popup trigger) ----------
 
+
 class SubmitRenewalInput(BaseModel):
     user_id: str = Field(
         ...,
-        description="Absher internal user id (e.g., 'user123')."
+        description="Absher internal user id (e.g., 'user123').",
     )
     service_type: Literal[
         "national_id",
@@ -40,7 +44,6 @@ class SubmitRenewalInput(BaseModel):
         "passport",
         "vehicle_registration",
     ] = Field(..., description="Which service to renew.")
-
     reason: str = Field(
         ...,
         description="Short explanation for the UI (what will happen and why).",

@@ -1,32 +1,31 @@
-# notification_ai.py
 from datetime import datetime, timezone
-from typing import Tuple
+from typing import Optional, Tuple
 
 from langchain_core.prompts import ChatPromptTemplate
 
 from config import notification_llm
 from models import User, UserService
-from typing import Optional
 
-# We can reuse the same logic as build_services_status,
-# but keep it local here to avoid circular imports.
-def build_services_status_for_notifications(user: User) -> str:
+
+def _build_services_status_for_notifications(user: User) -> str:
+    """
+    Summarize the user's service status for login summaries.
+    """
     now = datetime.now(timezone.utc)
     s = user.services
 
     if not s:
         return "User has no registered services."
 
-    lines = []
+    lines: list[str] = []
 
     def add_status(label: str, expiry: Optional[datetime]) -> None:
         if expiry is None:
             return
-        if expiry.tzinfo is None:
-            expiry_aware = expiry.replace(tzinfo=timezone.utc)
-        else:
-            expiry_aware = expiry
 
+        expiry_aware = (
+            expiry.replace(tzinfo=timezone.utc) if expiry.tzinfo is None else expiry
+        )
         days_left = (expiry_aware - now).days
 
         if days_left < 0:
@@ -44,7 +43,6 @@ def build_services_status_for_notifications(user: User) -> str:
     add_status("Passport", s.passport_expire_date)
 
     return "\n".join(lines) if lines else "User has no registered services."
-
 
 
 # -------------------------------------------------
@@ -80,6 +78,9 @@ async def generate_proactive_sms_for_service(
     days_left: int,
     service_status: str,
 ) -> str:
+    """
+    Generate a short Arabic SMS about an expiring/expired service.
+    """
     prompt_str = proactive_sms_prompt.format(
         user_name=user.name,
         service_name=service.service_name,
@@ -130,8 +131,11 @@ SMS:
 )
 
 
-async def generate_login_summary_messages(user: User) -> str:
-    services_status = build_services_status_for_notifications(user)
+async def generate_login_summary_messages(user: User) -> Tuple[str, str]:
+    """
+    Generate an in-app and SMS login summary (Arabic only).
+    """
+    services_status = _build_services_status_for_notifications(user)
 
     prompt_str = login_summary_prompt.format(
         user_name=user.name,
@@ -144,7 +148,6 @@ async def generate_login_summary_messages(user: User) -> str:
     in_app = ""
     sms = ""
 
-    # Very simple parsing based on the fixed format
     if "IN_APP:" in text and "SMS:" in text:
         _, rest = text.split("IN_APP:", 1)
         in_app_part, sms_part = rest.split("SMS:", 1)

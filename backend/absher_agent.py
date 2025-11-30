@@ -1,18 +1,17 @@
-# backend/absher_agent.py
-from typing import Dict
+from typing import Any, Dict
 
-from langchain_openai import ChatOpenAI
-from langchain.agents import initialize_agent, AgentType
-from langchain.tools import StructuredTool
-from langchain_core.messages import SystemMessage
+from langchain.agents import AgentType, initialize_agent
 from langchain.memory import ConversationBufferMemory
+from langchain_core.messages import SystemMessage
 from langchain_core.prompts import MessagesPlaceholder
+from langchain_openai import ChatOpenAI
+from langchain.tools import StructuredTool
 
 from absher_tools import (
-    search_absher_docs_tool,
     SearchAbsherDocsInput,
-    submit_renewal_request_tool,
     SubmitRenewalInput,
+    search_absher_docs_tool,
+    submit_renewal_request_tool,
 )
 
 SYSTEM_PROMPT = """
@@ -78,15 +77,16 @@ General Safety Rules:
 - Always be clear, polite, professional, and helpful.
 
 Your role:
-Guide the user like a knowledgeable Absher assistant, but all final actions — fees, payments, and renewal execution — are handled by the system outside of your control.
+Guide the user like a knowledgeable Absher assistant, but all final actions —
+fees, payments, and renewal execution — are handled by the system outside of your control.
 """
 
 
-
-def build_absher_agent(model: str = "gpt-4.1-mini"):
-    llm = ChatOpenAI(model=model, temperature=0.2)
-
-    tools = [
+def _build_tools() -> list[StructuredTool]:
+    """
+    Define the tools available to AbsherAgent.
+    """
+    return [
         StructuredTool.from_function(
             name="search_absher_docs",
             func=search_absher_docs_tool,
@@ -114,6 +114,17 @@ def build_absher_agent(model: str = "gpt-4.1-mini"):
     ]
 
 
+def build_absher_agent(model: str = "gpt-4.1-mini"):
+    """
+    Build and return a LangChain AgentExecutor configured with:
+    - Absher system prompt
+    - RAG + renewal tools
+    - Conversation memory
+    - Intermediate steps enabled (for extracting tool calls)
+    """
+    llm = ChatOpenAI(model=model, temperature=0.2)
+    tools = _build_tools()
+
     memory = ConversationBufferMemory(
         memory_key="chat_history",
         return_messages=True,
@@ -126,7 +137,7 @@ def build_absher_agent(model: str = "gpt-4.1-mini"):
         verbose=True,
         handle_parsing_errors=True,
         memory=memory,
-        return_intermediate_steps=True,  # IMPORTANT for extracting tool calls
+        return_intermediate_steps=True,
         agent_kwargs={
             "system_message": SystemMessage(content=SYSTEM_PROMPT),
             "extra_prompt_messages": [
