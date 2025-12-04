@@ -91,8 +91,10 @@ def build_services_status(user: User) -> str:
 def _proposed_action_from_tool_input(tool_input: dict) -> ProposedAction:
     """
     Convert submit_renewal_request tool_input into ProposedAction.
-    Tool no longer contains payment fields; we compute them here
-    using the official pricing API.
+
+    We compute the fee here for the UI/payment layer, but we DO NOT
+    include any specific numeric fee in the natural-language description,
+    to stay consistent with the AbsherAgent system prompt.
     """
     service_type = tool_input.get("service_type")
     reason = tool_input.get("reason", "Renew the selected service.")
@@ -101,16 +103,24 @@ def _proposed_action_from_tool_input(tool_input: dict) -> ProposedAction:
     currency = "SAR"
     action_type = f"renew_{service_type}" if service_type else "renew_unknown"
 
+    # No explicit fee number in the description; keep it generic.
+    description = (
+        f"{reason} سيتم احتساب الرسوم الرسمية تلقائيًا من نظام أبشر في خطوة الدفع."
+    )
+
     return ProposedAction(
         id=str(uuid.uuid4()),
         type=action_type,
-        description=f"{reason} (الرسوم {amount} {currency})",
+        description=description,
         data={
+            # UI/payment flow can still use the exact amount,
+            # but it's not spoken by the agent.
             "service_type": service_type,
             "amount": amount,
             "currency": currency,
         },
     )
+
 
 
 async def handle_chat(
