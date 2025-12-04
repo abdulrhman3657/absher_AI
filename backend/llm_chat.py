@@ -155,13 +155,20 @@ User message:
     # intermediate_steps: List[Tuple[AgentAction, Any]]
     intermediate_steps: List[Tuple[Any, Any]] = result.get("intermediate_steps", [])
 
-    for action, _tool_result in intermediate_steps:
-        # For AgentType.OPENAI_FUNCTIONS, action.tool is the tool name
+    for action, tool_result in intermediate_steps:
         if getattr(action, "tool", None) == "submit_renewal_request":
+
+            # Check if tool succeeded
+            if not isinstance(tool_result, dict) or not tool_result.get("ok", False):
+                # Optional: return an error message to user
+                continue  # Do NOT create a ProposedAction popup
+
             tool_input = getattr(action, "tool_input", {}) or {}
+
             if isinstance(tool_input, dict):
                 proposed_action = _proposed_action_from_tool_input(tool_input)
                 break
+
 
     return ChatResponse(
         reply=reply_text,
