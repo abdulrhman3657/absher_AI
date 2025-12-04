@@ -80,37 +80,48 @@ export default function App() {
     }
   }
 
-  async function handleLogin(e) {
-    e.preventDefault();
-    setLoginError(null);
-    setLoginLoading(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: loginUsername,
-          password: loginPassword,
-        }),
-      });
+async function handleLogin(e) {
+  e.preventDefault();
+  setLoginError(null);
+  setLoginLoading(true);
 
-      if (!res.ok) {
-        throw new Error("Invalid credentials");
+  try {
+    const res = await fetch(`${BACKEND_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: loginUsername,
+        password: loginPassword,
+      }),
+    });
+
+    if (!res.ok) {
+      // Backend reachable but rejected → most likely credentials
+      if (res.status === 401) {
+        setLoginError("اسم المستخدم أو كلمة المرور غير صحيحة");
+        return;
       }
 
-      const data = await res.json();
-      setUserId(data.user_id);
-      setUserName(data.name);
-      setMessages([]);
-      setNotifications([]);
-      setToast(`مرحباً ${data.name}!`);
-    } catch (e) {
-      console.error(e);
-      setLoginError("اسم المستخدم أو كلمة المرور غير صحيحة");
-    } finally {
-      setLoginLoading(false);
+      // Other HTTP errors
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || `خطأ من الخادم (${res.status})`);
     }
+
+    const data = await res.json();
+    setUserId(data.user_id);
+    setUserName(data.name);
+    setMessages([]);
+    setNotifications([]);
+    setToast(`مرحباً ${data.name}!`);
+  } catch (e) {
+    console.error(e);
+    // Network-level errors → explain it correctly
+    setLoginError("تعذر الاتصال بالخادم.");
+  } finally {
+    setLoginLoading(false);
   }
+}
+
 
   async function sendMessage() {
     if (!input.trim() || loading || !userId) return;
