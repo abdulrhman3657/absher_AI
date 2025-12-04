@@ -174,6 +174,14 @@ async function handleLogin(e) {
 async function confirmAction(accepted, paymentData) {
   if (!userId || !proposedAction) return;
 
+  // NEW: get service_type from proposedAction
+  const serviceType = proposedAction.data?.service_type;
+  if (!serviceType) {
+    console.error("Missing service_type in proposedAction.data");
+    setToast("لا يمكن تحديد نوع الخدمة للتجديد.");
+    return;
+  }
+
   setActionLoading(true);
   try {
     if (!accepted) {
@@ -185,6 +193,7 @@ async function confirmAction(accepted, paymentData) {
           user_id: userId,
           action_id: proposedAction.id,
           accepted: false,
+          service_type: serviceType, // <-- IMPORTANT
         }),
       });
 
@@ -224,7 +233,7 @@ async function confirmAction(accepted, paymentData) {
         return;
       }
 
-      // 2) Payment OK → confirm action (renew services)
+      // 2) Payment OK → confirm action (renew THIS specific service)
       const res = await fetch(`${BACKEND_URL}/confirm-action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -232,6 +241,7 @@ async function confirmAction(accepted, paymentData) {
           user_id: userId,
           action_id: proposedAction.id,
           accepted: true,
+          service_type: serviceType, // <-- IMPORTANT
         }),
       });
 
@@ -248,7 +258,6 @@ async function confirmAction(accepted, paymentData) {
       ]);
 
       setToast("تم الدفع وتجديد الخدمة بنجاح.");
-      // Optionally refresh notifications to show updated expiry
       fetchNotifications();
     }
   } catch (e) {
@@ -259,6 +268,7 @@ async function confirmAction(accepted, paymentData) {
     setProposedAction(null);
   }
 }
+
 
   async function runProactive() {
     if (!userId) return;

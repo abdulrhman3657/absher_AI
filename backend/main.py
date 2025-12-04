@@ -32,6 +32,7 @@ from store import (
     get_user_notifications,
     renew_expiring_services_for_user,
     search_notifications,
+    renew_specific_service_for_user
 )
 
 SERVICE_NAME_AR: Dict[str, str] = {
@@ -179,28 +180,29 @@ async def list_notifications(user_id: str) -> List[NotificationOut]:
 async def confirm_action(payload: ConfirmActionRequest) -> ConfirmActionResponse:
     """
     Confirm or reject an action proposed by the agent.
-    Now it actually renews expiring services for the user,
-    and returns a user-friendly Arabic message.
+
+    Only renews the specific service the user confirmed, instead of
+    all expiring services.
     """
     user = _get_session_user_or_404(payload.user_id)
 
     if payload.accepted:
-        renewed = renew_expiring_services_for_user(user_id=payload.user_id)
+        renewed = renew_specific_service_for_user(
+            user_id=payload.user_id,
+            service_type=payload.service_type,
+        )
 
         if renewed:
-            parts: List[str] = []
-            for svc in renewed:
-                name_en = svc.service_name
-                name_ar = SERVICE_NAME_AR.get(name_en, name_en)
-                date_str = svc.expiry_date.date().isoformat()
-                parts.append(f"{name_ar} (تاريخ الانتهاء الجديد {date_str})")
-
-            services_str = "، ".join(parts)
-            detail = f"تم الدفع وتجديد الخدمات التالية بنجاح: {services_str}."
+            # renewed is a single UserService
+            name_en = renewed.service_name
+            name_ar = SERVICE_NAME_AR.get(name_en, name_en)
+            date_str = renewed.expiry_date.date().isoformat()
+            services_str = f"{name_ar} (تاريخ الانتهاء الجديد {date_str})"
+            detail = f"تم الدفع وتجديد الخدمة التالية بنجاح: {services_str}."
         else:
             detail = (
-                "تم تأكيد الطلب، ولكن لا توجد خدمات منتهية أو قريبة الانتهاء "
-                "ليتم تجديدها حالياً."
+                "تم تأكيد الطلب، ولكن لا توجد خدمة منتهية أو قريبة الانتهاء "
+                "من النوع المحدد ليتم تجديدها حالياً."
             )
         status = "accepted"
     else:

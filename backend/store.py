@@ -226,3 +226,48 @@ def renew_expiring_services_for_user(
         renewed.append(svc)
 
     return renewed
+
+
+def renew_specific_service_for_user(
+    user_id: str,
+    service_type: ServiceType,
+    threshold_days: int = 3,
+) -> Optional[UserService]:
+    """
+    Renew a SINGLE service (by type) for this session user if it is expiring
+    in <= threshold_days days.
+
+    Returns the renewed UserService with the NEW expiry date,
+    or None if nothing was renewed.
+    """
+    user = USERS.get(user_id)
+    if not user:
+        return None
+
+    now = datetime.now(timezone.utc)
+
+    for svc in iter_user_services(user):
+        if svc.service_type != service_type:
+            continue
+
+        days_left = (svc.expiry_date - now).days
+        if days_left > threshold_days:
+            # Not close enough to expiry – follow the same business rule
+            return None
+
+        base = max(now, svc.expiry_date)
+        new_expiry = base + timedelta(days=365)
+        svc.expiry_date = new_expiry
+
+        if svc.service_type == ServiceType.NATIONAL_ID:
+            user.services.national_id_expire_date = new_expiry
+        elif svc.service_type == ServiceType.LICENSE:
+            user.services.driver_license_expire_date = new_expiry
+        elif svc.service_type == ServiceType.VEHICLE:
+            user.services.vehicle_registration_expire_date = new_expiry
+        elif svc.service_type == ServiceType.PASSPORT:
+            user.services.passport_expire_date = new_expiry
+
+        return svc
+
+    return None

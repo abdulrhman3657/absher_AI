@@ -72,6 +72,7 @@ class ConfirmActionRequest(BaseModel):
     user_id: str
     action_id: str
     accepted: bool
+    service_type: ServiceType
 
 
 class ConfirmActionResponse(BaseModel):
