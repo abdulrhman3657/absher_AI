@@ -270,21 +270,24 @@ async function confirmAction(accepted, paymentData) {
 }
 
 
-  async function runProactive() {
-    if (!userId) return;
-    setProactiveRunning(true);
+async function runProactive() {
+  if (!userId) return;
+  setProactiveRunning(true);
 
-    try {
-      await fetch(`${BACKEND_URL}/run_proactive`, { method: "POST" });
-      await fetchNotifications();
-      setToast("تم تشغيل المحرك الاستباقي.");
-    } catch (e) {
-      console.error(e);
-      setToast("فشل تشغيل المحرك الاستباقي.");
-    } finally {
-      setProactiveRunning(false);
-    }
+  try {
+    await fetch(`${BACKEND_URL}/run_proactive?user_id=${encodeURIComponent(userId)}`, {
+      method: "POST",
+    });
+    await fetchNotifications();
+    setToast("تم تشغيل المحرك الاستباقي.");
+  } catch (e) {
+    console.error(e);
+    setToast("فشل تشغيل المحرك الاستباقي.");
+  } finally {
+    setProactiveRunning(false);
   }
+}
+
 
   // ---------- Voice helpers ----------
 

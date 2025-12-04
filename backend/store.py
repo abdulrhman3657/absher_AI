@@ -187,47 +187,6 @@ def search_notifications(user_id: str, query: str, k: int = 3) -> List[Notificat
     return [n for n in NOTIFICATIONS if n.id in notif_ids]
 
 
-def renew_expiring_services_for_user(
-    user_id: str,
-    threshold_days: int = 3,
-) -> List[UserService]:
-    """
-    Renew all services for this session user that are expiring in <= threshold_days.
-    For demo we extend each by 1 year from the later of now/expiry.
-
-    Returns a list of UserService objects with the NEW expiry dates.
-    Changes are in-memory only (not persisted to users.json).
-    """
-    user = USERS.get(user_id)
-    if not user:
-        return []
-
-    now = datetime.now(timezone.utc)
-    renewed: List[UserService] = []
-
-    for svc in iter_user_services(user):
-        days_left = (svc.expiry_date - now).days
-        if days_left > threshold_days:
-            continue
-
-        base = max(now, svc.expiry_date)
-        new_expiry = base + timedelta(days=365)
-        svc.expiry_date = new_expiry
-
-        if svc.service_type == ServiceType.NATIONAL_ID:
-            user.services.national_id_expire_date = new_expiry
-        elif svc.service_type == ServiceType.LICENSE:
-            user.services.driver_license_expire_date = new_expiry
-        elif svc.service_type == ServiceType.VEHICLE:
-            user.services.vehicle_registration_expire_date = new_expiry
-        elif svc.service_type == ServiceType.PASSPORT:
-            user.services.passport_expire_date = new_expiry
-
-        renewed.append(svc)
-
-    return renewed
-
-
 def renew_specific_service_for_user(
     user_id: str,
     service_type: ServiceType,

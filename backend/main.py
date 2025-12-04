@@ -1,7 +1,7 @@
 # backend/main.py
-import asyncio
 import io
 import uuid
+from contextlib import asynccontextmanager
 from typing import Dict, List
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -23,16 +23,17 @@ from models import (
     TextToSpeechRequest,
 )
 from notification_ai import generate_login_summary_messages
-from proactive import run_proactive_engine, start_scheduler
+from proactive import run_proactive_for_user
+
+
 from store import (
     USERS,
     add_notification,
     create_session_user_from_template,
     get_user_by_username,
     get_user_notifications,
-    renew_expiring_services_for_user,
+    renew_specific_service_for_user,
     search_notifications,
-    renew_specific_service_for_user
 )
 
 SERVICE_NAME_AR: Dict[str, str] = {
@@ -59,14 +60,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-async def on_startup() -> None:
-    """
-    Start background scheduler for proactive notifications.
-    """
-    start_scheduler()
 
 
 # -------------------------------------------------------------------
@@ -103,41 +96,39 @@ async def health() -> Dict[str, str]:
 
 @app.post("/login", response_model=LoginResponse)
 async def login(payload: LoginRequest) -> LoginResponse:
-    """
-    Login using template users from users.json, then create a
-    per-session user clone so multiple people can safely use the
-    same demo accounts in parallel.
-    """
     template_user = get_user_by_username(payload.username)
     if not template_user or template_user.password != payload.password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     session_id = create_session_user_from_template(template_user)
 
-    async def _create_login_notification(session_user_id: str):
-        try:
-            user_obj = USERS.get(session_user_id)
-            if not user_obj:
-                return
-
+    # 1) In-app login summary (synchronous)
+    try:
+        user_obj = USERS.get(session_id)
+        if user_obj:
             in_app_msg, sms_msg = await generate_login_summary_messages(user_obj)
 
             add_notification(
-                user_id=session_user_id,
+                user_id=session_id,
                 channel="in_app",
                 message=in_app_msg,
                 meta={"source": "login_summary"},
             )
-            # SMS text (sms_msg) can be used in a real system to send an SMS.
-        except Exception as exc:  # noqa: BLE001
-            print(f"[LOGIN] Failed to generate login summary notification: {exc}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[LOGIN] Failed to generate login summary notification: {exc}")
 
-    asyncio.create_task(_create_login_notification(session_id))
+    # 2) Proactive SMS for THIS user only
+    try:
+        await run_proactive_for_user(session_id)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[LOGIN] Failed to run proactive engine for user {session_id}: {exc}")
 
     return LoginResponse(
-        user_id=session_id,  # frontend stores this as user_id
+        user_id=session_id,
         name=template_user.name,
     )
+
+
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -181,8 +172,8 @@ async def confirm_action(payload: ConfirmActionRequest) -> ConfirmActionResponse
     """
     Confirm or reject an action proposed by the agent.
 
-    Only renews the specific service the user confirmed, instead of
-    all expiring services.
+    Now it renews ONLY the specific service type included in the payload,
+    instead of all expiring services.
     """
     user = _get_session_user_or_404(payload.user_id)
 
@@ -193,7 +184,6 @@ async def confirm_action(payload: ConfirmActionRequest) -> ConfirmActionResponse
         )
 
         if renewed:
-            # renewed is a single UserService
             name_en = renewed.service_name
             name_ar = SERVICE_NAME_AR.get(name_en, name_en)
             date_str = renewed.expiry_date.date().isoformat()
@@ -215,13 +205,16 @@ async def confirm_action(payload: ConfirmActionRequest) -> ConfirmActionResponse
 
 
 @app.post("/run_proactive", response_model=List[NotificationOut])
-async def run_proactive_endpoint() -> List[NotificationOut]:
+async def run_proactive_endpoint(user_id: str) -> List[NotificationOut]:
     """
-    Manual trigger for the proactive engine.
+    Manual trigger for the proactive engine for a SINGLE user.
     Frontend uses this button in the SMS mock panel.
     """
-    created = await run_proactive_engine()
+    _get_session_user_or_404(user_id)
+
+    created = await run_proactive_for_user(user_id)
     return [_notification_to_out(n) for n in created]
+
 
 
 # ================================
