@@ -1,9 +1,23 @@
 # backend/models.py
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+class UserMedia(BaseModel):
+    id: str
+    user_id: str          # session_id
+    kind: Literal["id_photo", "license_photo", "other"]
+    filename: str
+    created_at: datetime
+
+
+class UploadMediaResponse(BaseModel):
+    media_id: str
+    kind: str
+
 
 
 class ServicesExpiry(BaseModel):

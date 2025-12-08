@@ -35,6 +35,9 @@ export default function App() {
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
 
+  // Image uploading (ID photo)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
   // ---------- load user from localStorage on first render ----------
   useEffect(() => {
     try {
@@ -80,214 +83,253 @@ export default function App() {
     }
   }
 
-async function handleLogin(e) {
-  e.preventDefault();
-  setLoginError(null);
-  setLoginLoading(true);
+  async function handleLogin(e) {
+    e.preventDefault();
+    setLoginError(null);
+    setLoginLoading(true);
 
-  try {
-    const res = await fetch(`${BACKEND_URL}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: loginUsername,
-        password: loginPassword,
-      }),
-    });
+    try {
+      const res = await fetch(`${BACKEND_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: loginUsername,
+          password: loginPassword,
+        }),
+      });
 
-    if (!res.ok) {
-      // Backend reachable but rejected → most likely credentials
-      if (res.status === 401) {
-        setLoginError("اسم المستخدم أو كلمة المرور غير صحيحة");
-        return;
+      if (!res.ok) {
+        // Backend reachable but rejected → most likely credentials
+        if (res.status === 401) {
+          setLoginError("اسم المستخدم أو كلمة المرور غير صحيحة");
+          return;
+        }
+
+        // Other HTTP errors
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `خطأ من الخادم (${res.status})`);
       }
 
-      // Other HTTP errors
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.detail || `خطأ من الخادم (${res.status})`);
+      const data = await res.json();
+      setUserId(data.user_id);
+      setUserName(data.name);
+      setMessages([]);
+      setNotifications([]);
+      setToast(`مرحباً ${data.name}!`);
+    } catch (e) {
+      console.error(e);
+      // Network-level errors → explain it correctly
+      setLoginError("تعذر الاتصال بالخادم.");
+    } finally {
+      setLoginLoading(false);
     }
+  }
+
+async function sendMessage(customText) {
+  const raw = customText != null ? customText : input;
+  const text = raw.trim();
+
+  if (!text || loading || !userId) return;
+
+  // Only clear the textarea if this came from the textarea
+  if (customText == null) {
+    setInput("");
+  }
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      id: Date.now(),
+      from: "user",
+      text,
+      time: new Date().toISOString(),
+    },
+  ]);
+
+  setLoading(true);
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, message: text }),
+    });
 
     const data = await res.json();
-    setUserId(data.user_id);
-    setUserName(data.name);
-    setMessages([]);
-    setNotifications([]);
-    setToast(`مرحباً ${data.name}!`);
-  } catch (e) {
-    console.error(e);
-    // Network-level errors → explain it correctly
-    setLoginError("تعذر الاتصال بالخادم.");
-  } finally {
-    setLoginLoading(false);
-  }
-}
-
-
-  async function sendMessage() {
-    if (!input.trim() || loading || !userId) return;
-
-    const text = input.trim();
-    setInput("");
 
     setMessages((prev) => [
       ...prev,
       {
-        id: Date.now(),
-        from: "user",
-        text,
+        id: Date.now() + 1,
+        from: "agent",
+        text: data.reply,
         time: new Date().toISOString(),
       },
     ]);
 
-    setLoading(true);
+    if (data.proposed_action) {
+      setProposedAction(data.proposed_action);
+    }
+  } catch (e) {
+    console.error(e);
+    setToast("حدث خطأ أثناء الاتصال بالخادم.");
+  } finally {
+    setLoading(false);
+  }
+}
 
+
+async function handleUploadIdPhoto(e) {
+  const file = e.target.files?.[0];
+  if (!file || !userId) return;
+
+  setUploadingPhoto(true);
+  try {
+    const formData = new FormData();
+    formData.append("user_id", userId);
+    formData.append("file", file);
+
+    const res = await fetch(`${BACKEND_URL}/upload/id-photo`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "فشل رفع الصورة.");
+    }
+
+    setToast("تم رفع صورة الهوية بنجاح.");
+
+    // 🔴 This actually talks to the agent:
+    await sendMessage("تم رفع صورة الهوية الوطنية المطلوبة.");
+  } catch (err) {
+    console.error(err);
+    setToast("فشل رفع الصورة. تأكد من أن الملف صورة وحاول مرة أخرى.");
+  } finally {
+    setUploadingPhoto(false);
+    e.target.value = "";
+  }
+}
+
+
+  async function confirmAction(accepted, paymentData) {
+    if (!userId || !proposedAction) return;
+
+    const serviceType = proposedAction.data?.service_type;
+    if (!serviceType) {
+      console.error("Missing service_type in proposedAction.data");
+      setToast("لا يمكن تحديد نوع الخدمة للتجديد.");
+      return;
+    }
+
+    setActionLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId, message: text }),
-      });
+      if (!accepted) {
+        // User rejected → no payment, just notify backend
+        const res = await fetch(`${BACKEND_URL}/confirm-action`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            action_id: proposedAction.id,
+            accepted: false,
+            service_type: serviceType,
+          }),
+        });
 
-      const data = await res.json();
+        const data = await res.json();
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 2,
+            from: "agent",
+            text: data.detail,
+            time: new Date().toISOString(),
+          },
+        ]);
+        setToast("تم رفض الإجراء.");
+      } else {
+        // 1) Call payment API
+        const amount = proposedAction.data?.amount;
+        const currency = proposedAction.data?.currency || "SAR";
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          from: "agent",
-          text: data.reply,
-          time: new Date().toISOString(),
-        },
-      ]);
+        const payRes = await fetch(`${BACKEND_URL}/payment/charge`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            action_id: proposedAction.id,
+            amount,
+            currency,
+            ...paymentData,
+          }),
+        });
 
-      if (data.proposed_action) {
-        setProposedAction(data.proposed_action);
+        const payData = await payRes.json();
+
+        if (!payRes.ok || payData.status !== "success") {
+          setToast(payData.failure_reason || "فشل الدفع.");
+          setActionLoading(false);
+          return;
+        }
+
+        // 2) Payment OK → confirm action (renew THIS specific service)
+        const res = await fetch(`${BACKEND_URL}/confirm-action`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            action_id: proposedAction.id,
+            accepted: true,
+            service_type: serviceType,
+          }),
+        });
+
+        const data = await res.json();
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 2,
+            from: "agent",
+            text: data.detail,
+            time: new Date().toISOString(),
+          },
+        ]);
+
+        setToast("تم الدفع وتجديد الخدمة بنجاح.");
+        fetchNotifications();
       }
     } catch (e) {
       console.error(e);
-      setToast("حدث خطأ أثناء الاتصال بالخادم.");
+      setToast("فشل معالجة الإجراء.");
     } finally {
-      setLoading(false);
+      setActionLoading(false);
+      setProposedAction(null);
     }
   }
 
-async function confirmAction(accepted, paymentData) {
-  if (!userId || !proposedAction) return;
+  async function runProactive() {
+    if (!userId) return;
+    setProactiveRunning(true);
 
-  // NEW: get service_type from proposedAction
-  const serviceType = proposedAction.data?.service_type;
-  if (!serviceType) {
-    console.error("Missing service_type in proposedAction.data");
-    setToast("لا يمكن تحديد نوع الخدمة للتجديد.");
-    return;
-  }
-
-  setActionLoading(true);
-  try {
-    if (!accepted) {
-      // User rejected → no payment, just notify backend
-      const res = await fetch(`${BACKEND_URL}/confirm-action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: userId,
-          action_id: proposedAction.id,
-          accepted: false,
-          service_type: serviceType, // <-- IMPORTANT
-        }),
-      });
-
-      const data = await res.json();
-      setMessages((prev) => [
-        ...prev,
+    try {
+      await fetch(
+        `${BACKEND_URL}/run_proactive?user_id=${encodeURIComponent(userId)}`,
         {
-          id: Date.now() + 2,
-          from: "agent",
-          text: data.detail,
-          time: new Date().toISOString(),
-        },
-      ]);
-      setToast("تم رفض الإجراء.");
-    } else {
-      // 1) Call payment API
-      const amount = proposedAction.data?.amount;
-      const currency = proposedAction.data?.currency || "SAR";
-
-      const payRes = await fetch(`${BACKEND_URL}/payment/charge`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: userId,
-          action_id: proposedAction.id,
-          amount,
-          currency,
-          ...paymentData,
-        }),
-      });
-
-      const payData = await payRes.json();
-
-      if (!payRes.ok || payData.status !== "success") {
-        setToast(payData.failure_reason || "فشل الدفع.");
-        setActionLoading(false);
-        return;
-      }
-
-      // 2) Payment OK → confirm action (renew THIS specific service)
-      const res = await fetch(`${BACKEND_URL}/confirm-action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: userId,
-          action_id: proposedAction.id,
-          accepted: true,
-          service_type: serviceType, // <-- IMPORTANT
-        }),
-      });
-
-      const data = await res.json();
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 2,
-          from: "agent",
-          text: data.detail,
-          time: new Date().toISOString(),
-        },
-      ]);
-
-      setToast("تم الدفع وتجديد الخدمة بنجاح.");
-      fetchNotifications();
+          method: "POST",
+        }
+      );
+      await fetchNotifications();
+      setToast("تم تشغيل المحرك الاستباقي.");
+    } catch (e) {
+      console.error(e);
+      setToast("فشل تشغيل المحرك الاستباقي.");
+    } finally {
+      setProactiveRunning(false);
     }
-  } catch (e) {
-    console.error(e);
-    setToast("فشل معالجة الإجراء.");
-  } finally {
-    setActionLoading(false);
-    setProposedAction(null);
   }
-}
-
-
-async function runProactive() {
-  if (!userId) return;
-  setProactiveRunning(true);
-
-  try {
-    await fetch(`${BACKEND_URL}/run_proactive?user_id=${encodeURIComponent(userId)}`, {
-      method: "POST",
-    });
-    await fetchNotifications();
-    setToast("تم تشغيل المحرك الاستباقي.");
-  } catch (e) {
-    console.error(e);
-    setToast("فشل تشغيل المحرك الاستباقي.");
-  } finally {
-    setProactiveRunning(false);
-  }
-}
-
 
   // ---------- Voice helpers ----------
 
@@ -309,7 +351,6 @@ async function runProactive() {
       const text = data.text || "";
       if (!text) return;
 
-      // Fill the input with transcribed text
       setInput((prev) => (prev ? prev + " " : "") + text);
     } catch (e) {
       console.error(e);
@@ -455,7 +496,6 @@ async function runProactive() {
             <div className="flex gap-4"><pre className="font-mono">fatimah </pre> <pre>password</pre></div>
             <div className="flex gap-4"><pre className="font-mono">khaled </pre> <pre>123123</pre>  </div>
           </div>
-          
         </div>
       </div>
     );
@@ -578,6 +618,19 @@ async function runProactive() {
                   placeholder="اكتب رسالة… أو استخدم الميكروفون 🎙️"
                 />
 
+                {/* Upload ID photo button */}
+                <label className="cursor-pointer rounded-xl border px-3 py-2 text-sm bg-white text-slate-700">
+                  {uploadingPhoto ? "جاري الرفع..." : "📷 صورة الهوية"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleUploadIdPhoto}
+                    disabled={uploadingPhoto}
+                  />
+                </label>
+
+                {/* Voice recording */}
                 <button
                   type="button"
                   onClick={toggleRecording}
@@ -590,7 +643,7 @@ async function runProactive() {
                 </button>
 
                 <button
-                  onClick={sendMessage}
+                  onClick={() => sendMessage()}
                   className="bg-emerald-600 text-white rounded-xl px-4 py-2 text-sm"
                 >
                   إرسال

@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from langchain_community.vectorstores import FAISS
 
 from config import embeddings
-from models import Notification, ServiceType, User, UserService
+from models import Notification, ServiceType, User, UserService, UserMedia
 
 # In-memory session users + notifications
 # USERS is keyed by a session_id (random UUID per login)
@@ -230,3 +230,22 @@ def renew_specific_service_for_user(
         return svc
 
     return None
+
+
+USER_MEDIA: Dict[str, List[UserMedia]] = {}  # keyed by session user_id
+
+
+def add_user_media(user_id: str, kind: str, filename: str) -> UserMedia:
+    media = UserMedia(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        kind=kind,
+        filename=filename,
+        created_at=datetime.now(timezone.utc),
+    )
+    USER_MEDIA.setdefault(user_id, []).append(media)
+    return media
+
+
+def get_user_media(user_id: str) -> List[UserMedia]:
+    return USER_MEDIA.get(user_id, [])

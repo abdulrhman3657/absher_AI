@@ -1,7 +1,6 @@
 # backend/main.py
 import io
 import uuid
-from contextlib import asynccontextmanager
 from typing import Dict, List
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -21,6 +20,7 @@ from models import (
     PaymentRequest,
     PaymentResponse,
     TextToSpeechRequest,
+    UploadMediaResponse
 )
 from notification_ai import generate_login_summary_messages
 from proactive import run_proactive_for_user
@@ -34,7 +34,14 @@ from store import (
     get_user_notifications,
     renew_specific_service_for_user,
     search_notifications,
+    add_user_media
 )
+
+from pathlib import Path
+from fastapi import Form
+from fastapi.staticfiles import StaticFiles
+
+
 
 SERVICE_NAME_AR: Dict[str, str] = {
     "National ID": "الهوية الوطنية",
@@ -62,6 +69,11 @@ app.add_middleware(
 )
 
 
+UPLOAD_DIR = Path(__file__).with_name("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
 # -------------------------------------------------------------------
 # Utility helpers
 # -------------------------------------------------------------------
@@ -87,6 +99,32 @@ def _notification_to_out(n) -> NotificationOut:
 # -------------------------------------------------------------------
 # Endpoints
 # -------------------------------------------------------------------
+
+@app.post("/upload/id-photo", response_model=UploadMediaResponse)
+async def upload_id_photo(
+    user_id: str = Form(...),
+    file: UploadFile = File(...),
+) -> UploadMediaResponse:
+    """
+    Upload a user photo to be used for National ID renewal (demo only).
+    """
+    _get_session_user_or_404(user_id)
+
+    # Basic content-type check (you can add more validation)
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="الملف يجب أن يكون صورة (image/*).")
+
+    # Save to disk
+    suffix = Path(file.filename or "").suffix or ".jpg"
+    filename = f"{user_id}_{uuid.uuid4().hex}{suffix}"
+    out_path = UPLOAD_DIR / filename
+
+    contents = await file.read()
+    out_path.write_bytes(contents)
+
+    media = add_user_media(user_id=user_id, kind="id_photo", filename=filename)
+
+    return UploadMediaResponse(media_id=media.id, kind=media.kind)
 
 
 @app.get("/health")
@@ -127,8 +165,6 @@ async def login(payload: LoginRequest) -> LoginResponse:
         user_id=session_id,
         name=template_user.name,
     )
-
-
 
 
 @app.post("/chat", response_model=ChatResponse)
