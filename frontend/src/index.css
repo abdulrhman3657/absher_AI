@@ -1,1 +1,181 @@
-@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Absher Design System - Government Portal UI */
+
+@layer base {
+  :root {
+    /* Absher Brand Colors - Official Green */
+    --primary: 160 100% 26%;
+    --primary-foreground: 0 0% 100%;
+    --primary-accent: 160 100% 30%;
+    
+    /* Text Colors */
+    --foreground: 0 0% 20%;
+    --foreground-light: 0 0% 40%;
+    --muted-foreground: 0 0% 50%;
+    
+    /* Backgrounds */
+    --background: 0 0% 97%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
+    
+    /* UI Elements */
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 177 100% 30%;
+    
+    /* Secondary & Accent */
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 20%;
+    --accent: 177 100% 30%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Muted */
+    --muted: 0 0% 95%;
+    
+    /* Popover */
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+    
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Radius */
+    --radius: 1rem;
+    
+    /* Shadows */
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.08);
+    
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 177 100% 30%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 177 100% 95%;
+    --sidebar-accent-foreground: 177 100% 30%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 177 100% 30%;
+    
+    /* Status Colors */
+    --status-warning: 45 100% 50%;
+    --status-success: 142 76% 36%;
+    --status-info: 199 89% 48%;
+    --status-pending: 25 95% 53%;
+  }
+
+  .dark {
+    --primary: 177 100% 35%;
+    --primary-foreground: 0 0% 100%;
+    --background: 220 20% 10%;
+    --foreground: 0 0% 95%;
+    --card: 220 20% 14%;
+    --card-foreground: 0 0% 95%;
+    --border: 220 20% 20%;
+    --input: 220 20% 20%;
+    --muted: 220 20% 18%;
+    --muted-foreground: 0 0% 60%;
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 0 0% 95%;
+    --accent: 177 100% 35%;
+    --accent-foreground: 0 0% 100%;
+    --popover: 220 20% 14%;
+    --popover-foreground: 0 0% 95%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    direction: rtl;
+  }
+
+  body {
+    @apply bg-background text-foreground font-cairo antialiased;
+  }
+}
+
+@layer components {
+  .absher-card {
+    @apply bg-card rounded-2xl p-6 transition-all duration-200;
+    box-shadow: var(--shadow-card);
+  }
+  
+  .absher-card:hover {
+    box-shadow: var(--shadow-hover);
+  }
+  
+  .section-title {
+    @apply text-xl font-bold text-foreground flex items-center gap-3;
+  }
+  
+  .section-marker {
+    @apply w-1 h-6 bg-primary rounded-full;
+  }
+  
+  .service-icon {
+    @apply w-20 h-20 rounded-xl border-2 border-dashed border-primary/40 flex items-center justify-center text-primary bg-primary/5;
+  }
+  
+  .service-icon-filled {
+    @apply w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center text-primary;
+  }
+  
+  .service-icon-square {
+    @apply w-16 h-16 rounded-xl border-2 border-dashed border-primary/30 flex items-center justify-center text-primary bg-white;
+  }
+  
+  .nav-icon-box {
+    @apply w-14 h-14 rounded-lg border border-border flex flex-col items-center justify-center gap-1 bg-white hover:border-primary hover:text-primary transition-all cursor-pointer;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium transition-all duration-200 hover:bg-primary/90 active:scale-[0.98];
+  }
+  
+  .btn-outline {
+    @apply border-2 border-primary text-primary px-6 py-3 rounded-xl font-medium transition-all duration-200 hover:bg-primary/5 active:scale-[0.98];
+  }
+  
+  .progress-bar {
+    @apply h-2 bg-muted rounded-full overflow-hidden;
+  }
+  
+  .progress-fill {
+    @apply h-full bg-primary rounded-full transition-all duration-500;
+  }
+  
+  .status-chip {
+    @apply px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .status-pending {
+    @apply bg-status-pending/10 text-orange-600;
+  }
+  
+  .status-processing {
+    @apply bg-primary/10 text-primary;
+  }
+  
+  .location-dot {
+    @apply w-2 h-2 rounded-full bg-primary;
+  }
+  
+  .nav-link {
+    @apply text-foreground-light hover:text-primary transition-colors duration-200 font-medium;
+  }
+}
+
+@layer utilities {
+  .text-foreground-light {
+    color: hsl(var(--foreground-light));
+  }
+}
