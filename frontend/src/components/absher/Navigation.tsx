@@ -1,7 +1,8 @@
 import { Search, LogOut, Globe, User, Bell, LayoutDashboard, BookOpen } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { getCurrentUser, logout } from "@/lib/api";
 
 const navItems = [
-  { icon: LogOut, label: "تسجيل الخروج" },
   { icon: Globe, label: "English" },
   { icon: BookOpen, label: "دليل الخدمات" },
   { icon: Bell, label: "الاشعارات" },
@@ -10,6 +11,13 @@ const navItems = [
 ];
 
 const Navigation = () => {
+  const navigate = useNavigate();
+  const currentUser = getCurrentUser();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
   return (
     <nav className="bg-card border-b border-border">
       <div className="max-w-7xl mx-auto px-6">
@@ -49,6 +57,15 @@ const Navigation = () => {
               </div>
             ))}
             
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="nav-icon-box hover:bg-red-50 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-5 h-5 text-foreground-light" strokeWidth={1.5} />
+              <span className="text-[10px] text-foreground-light">تسجيل الخروج</span>
+            </button>
+            
             {/* User Avatar */}
             <div className="nav-icon-box">
               <div className="w-8 h-8 rounded-full bg-amber-100 overflow-hidden">
@@ -56,7 +73,9 @@ const Navigation = () => {
                   <User className="w-5 h-5 text-amber-700" />
                 </div>
               </div>
-              <span className="text-[10px] text-foreground-light">عجلان</span>
+              <span className="text-[10px] text-foreground-light">
+                {currentUser?.name || "المستخدم"}
+              </span>
             </div>
           </div>
 

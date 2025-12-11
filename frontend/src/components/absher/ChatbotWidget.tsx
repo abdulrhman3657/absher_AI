@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import {
-  autoLogin,
+  getUserId,
   sendChatMessage,
   uploadIdPhoto,
   getUploadedImageUrl,
@@ -61,11 +61,12 @@ export default function ChatbotWidget() {
   const brandColor = useMemo(() => "#009A93", []);
   const brandDark = useMemo(() => "#0B7F74", []);
 
-  // Auto-login on mount
+  // Get user_id on mount
   useEffect(() => {
-    autoLogin().then((id) => {
+    const id = getUserId();
+    if (id) {
       setUserId(id);
-    });
+    }
   }, []);
 
   // Auto-scroll to bottom when messages change
