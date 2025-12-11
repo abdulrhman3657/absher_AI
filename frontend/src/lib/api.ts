@@ -34,42 +34,57 @@ export interface UploadMediaResponse {
   kind: string;
 }
 
-// Auto-login with demo user and return user_id
-export async function autoLogin(): Promise<string> {
-  // Check if we already have a user_id in localStorage
-  const storedUserId = localStorage.getItem("absher_user_id");
-  if (storedUserId) {
-    return storedUserId;
+// Login with username and password
+export async function login(
+  username: string,
+  password: string
+): Promise<LoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      username,
+      password,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Login failed");
   }
 
-  // Auto-login with demo user
-  try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        username: "abdullah",
-        password: "123456",
-      }),
-    });
+  const data: LoginResponse = await response.json();
+  localStorage.setItem("absher_user_id", data.user_id);
+  localStorage.setItem("absher_user_name", data.name);
+  return data;
+}
 
-    if (!response.ok) {
-      throw new Error("Login failed");
-    }
+// Check if user is logged in
+export function isLoggedIn(): boolean {
+  return !!localStorage.getItem("absher_user_id");
+}
 
-    const data: LoginResponse = await response.json();
-    localStorage.setItem("absher_user_id", data.user_id);
-    localStorage.setItem("absher_user_name", data.name);
-    return data.user_id;
-  } catch (error) {
-    console.error("Auto-login failed:", error);
-    // Fallback: generate a temporary user_id (won't work with backend, but prevents crashes)
-    const tempUserId = `temp-${Date.now()}`;
-    localStorage.setItem("absher_user_id", tempUserId);
-    return tempUserId;
+// Get current user info
+export function getCurrentUser(): { user_id: string; name: string } | null {
+  const user_id = localStorage.getItem("absher_user_id");
+  const name = localStorage.getItem("absher_user_name");
+  if (user_id && name) {
+    return { user_id, name };
   }
+  return null;
+}
+
+// Logout
+export function logout(): void {
+  localStorage.removeItem("absher_user_id");
+  localStorage.removeItem("absher_user_name");
+}
+
+// Get user_id (for backward compatibility)
+export function getUserId(): string | null {
+  return localStorage.getItem("absher_user_id");
 }
 
 // Send chat message to backend
