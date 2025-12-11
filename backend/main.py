@@ -1,11 +1,17 @@
 # backend/main.py
+import os
 import io
 import uuid
 from typing import Dict, List
+from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import requests
+from PIL import Image
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 
 from config import audio_client
 from llm_chat import handle_chat
@@ -20,27 +26,20 @@ from models import (
     PaymentRequest,
     PaymentResponse,
     TextToSpeechRequest,
-    UploadMediaResponse
+    UploadMediaResponse,
 )
 from notification_ai import generate_login_summary_messages
 from proactive import run_proactive_for_user
-
-
 from store import (
     USERS,
     add_notification,
+    add_user_media,
     create_session_user_from_template,
     get_user_by_username,
     get_user_notifications,
     renew_specific_service_for_user,
     search_notifications,
-    add_user_media
 )
-
-from pathlib import Path
-from fastapi import Form
-from fastapi.staticfiles import StaticFiles
-
 
 
 SERVICE_NAME_AR: Dict[str, str] = {
@@ -57,7 +56,7 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://absher-ai-1.onrender.com",
-    # "http://localhost" etc. can be added if needed
+    # add more if needed
 ]
 
 app.add_middleware(
@@ -67,7 +66,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 UPLOAD_DIR = Path(__file__).with_name("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -97,8 +95,9 @@ def _notification_to_out(n) -> NotificationOut:
 
 
 # -------------------------------------------------------------------
-# Endpoints
+# Image upload / ID photo processing
 # -------------------------------------------------------------------
+
 
 @app.post("/upload/id-photo", response_model=UploadMediaResponse)
 async def upload_id_photo(
@@ -107,24 +106,151 @@ async def upload_id_photo(
 ) -> UploadMediaResponse:
     """
     Upload a user photo to be used for National ID renewal (demo only).
+
+    Steps:
+    - Validate it's an image
+    - Call remove.bg to remove the background and replace with white
+    - Center-crop the result to 6x8 (3:4 aspect ratio), always
+    - Resize to a fixed ID-friendly resolution (600x800)
+    - Save to disk and register via add_user_media
     """
     _get_session_user_or_404(user_id)
 
-    # Basic content-type check (you can add more validation)
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="الملف يجب أن يكون صورة (image/*).")
-
-    # Save to disk
-    suffix = Path(file.filename or "").suffix or ".jpg"
-    filename = f"{user_id}_{uuid.uuid4().hex}{suffix}"
-    out_path = UPLOAD_DIR / filename
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="الملف يجب أن يكون صورة (image/*).",
+        )
 
     contents = await file.read()
-    out_path.write_bytes(contents)
+    if not contents:
+        raise HTTPException(status_code=400, detail="الملف فارغ.")
+
+    # Get remove.bg API key from environment
+    removebg_api_key = os.getenv("REMOVEBG_API_KEY")
+    if not removebg_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="خدمة إزالة الخلفية غير مفعلة (REMOVEBG_API_KEY مفقود).",
+        )
+
+    # --- Call remove.bg API ---
+    # - bg_color=ffffff: white background
+    # - crop=true + crop_margin: trim empty space but keep some margin around subject
+    try:
+        response = requests.post(
+            "https://api.remove.bg/v1.0/removebg",
+            headers={"X-Api-Key": removebg_api_key},
+            files={"image_file": ("upload", contents, file.content_type)},
+            data={
+                "size": "auto",
+                "crop": "true",
+                "crop_margin": "10%",
+                "bg_color": "ffffff",
+                # You can tune scale to zoom in/out globally if needed:
+                # "scale": "80%",
+            },
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        print("[UPLOAD] remove.bg request error:", exc)
+        raise HTTPException(
+            status_code=502,
+            detail="تعذر الاتصال بخدمة إزالة الخلفية.",
+        ) from exc
+
+    if response.status_code != 200:
+        print("[UPLOAD] remove.bg error:", response.status_code, response.text)
+        raise HTTPException(
+            status_code=502,
+            detail="فشل في إزالة خلفية الصورة. الرجاء المحاولة لاحقاً.",
+        )
+
+    processed_bytes = response.content
+    if not processed_bytes:
+        raise HTTPException(
+            status_code=502,
+            detail="خدمة إزالة الخلفية لم ترجع صورة صالحة.",
+        )
+
+    # --- Open processed image with Pillow ---
+    try:
+        img = Image.open(io.BytesIO(processed_bytes))
+    except Exception as exc:  # noqa: BLE001
+        print("[UPLOAD] Failed to open processed image:", exc)
+        raise HTTPException(
+            status_code=502,
+            detail="فشل في قراءة الصورة بعد إزالة الخلفية.",
+        ) from exc
+
+    # Ensure RGB (remove.bg may return PNG with alpha)
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+
+    # --- Center crop to 6x8 (3:4 aspect ratio), always ---
+    # 6x8 => aspect ratio width/height = 3/4 = 0.75
+    target_ratio = 3 / 4  # width / height
+
+    width, height = img.size
+    if height == 0 or width == 0:
+        raise HTTPException(
+            status_code=500,
+            detail="الصورة الناتجة غير صالحة (أبعاد صفرية).",
+        )
+
+    current_ratio = width / height
+
+    if current_ratio > target_ratio:
+        # Image is too wide -> crop width
+        new_width = int(height * target_ratio)
+        left = (width - new_width) // 2
+        right = left + new_width
+        top = 0
+        bottom = height
+    elif current_ratio < target_ratio:
+        # Image is too tall -> crop height
+        new_height = int(width / target_ratio)
+        top = (height - new_height) // 2
+        bottom = top + new_height
+        left = 0
+        right = width
+    else:
+        # Already exactly 3:4 -> we still crop a bit to "zoom" slightly
+        zoom_factor = 0.9  # keep 90% of width/height
+        new_width = int(width * zoom_factor)
+        new_height = int(height * zoom_factor)
+        left = (width - new_width) // 2
+        top = (height - new_height) // 2
+        right = left + new_width
+        bottom = top + new_height
+
+    img = img.crop((left, top, right, bottom))
+
+    # --- Resize to fixed ID-style dimensions (still 3:4) ---
+    target_size = (600, 800)  # (width, height)
+    img = img.resize(target_size, Image.LANCZOS)
+
+    # --- Save final image to disk as JPEG ---
+    filename = f"{user_id}_{uuid.uuid4().hex}.jpg"
+    out_path = UPLOAD_DIR / filename
+
+    try:
+        img.save(out_path, format="JPEG", quality=90)
+    except Exception as exc:  # noqa: BLE001
+        print("[UPLOAD] Failed to save processed image:", exc)
+        raise HTTPException(
+            status_code=500,
+            detail="فشل حفظ الصورة بعد المعالجة.",
+        ) from exc
 
     media = add_user_media(user_id=user_id, kind="id_photo", filename=filename)
 
     return UploadMediaResponse(media_id=media.id, kind=media.kind)
+
+
+# -------------------------------------------------------------------
+# Health, login, chat, notifications, proactive, voice, payment
+# -------------------------------------------------------------------
 
 
 @app.get("/health")
@@ -252,7 +378,6 @@ async def run_proactive_endpoint(user_id: str) -> List[NotificationOut]:
     return [_notification_to_out(n) for n in created]
 
 
-
 # ================================
 # Voice: speech-to-text
 # ================================
@@ -332,8 +457,6 @@ async def charge_payment(payload: PaymentRequest) -> PaymentResponse:
 
 
 if __name__ == "__main__":
-    import os
-
     import uvicorn
 
     port = int(os.getenv("PORT", "8000"))  # Render sets PORT

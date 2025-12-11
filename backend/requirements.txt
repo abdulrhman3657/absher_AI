@@ -10,3 +10,9 @@ schedule==1.2.2
 
 python-multipart>=0.0.9
 openai>=1.59.0
+
+# --- Image Processing (safe on Windows + Python 3.11) ---
+Pillow>=10.0.0,<11.0.0   # fully compatible wheels for Win11 + Python 3.11
+
+# --- HTTP Requests (no native DLLs, fully compatible) ---
+requests>=2.32.0,<3.0.0
