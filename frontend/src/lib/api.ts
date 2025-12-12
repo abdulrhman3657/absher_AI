@@ -34,6 +34,10 @@ export interface UploadMediaResponse {
   kind: string;
 }
 
+export interface TextToSpeechRequest {
+  text: string;
+}
+
 // Login with username and password
 export async function login(
   username: string,
@@ -136,6 +140,25 @@ export async function uploadIdPhoto(
 // Get uploaded image URL
 export function getUploadedImageUrl(filename: string): string {
   return `${API_BASE_URL}/uploads/${filename}`;
+}
+
+// Convert text to speech and return a temporary object URL
+export async function textToSpeech(text: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/voice/tts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text } satisfies TextToSpeechRequest),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Text-to-speech failed: ${errorText}`);
+  }
+
+  const audioBlob = await response.blob();
+  return URL.createObjectURL(audioBlob);
 }
 
 // Transcribe audio to text

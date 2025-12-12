@@ -5,6 +5,7 @@ import {
   Image,
   MessageCircle,
   Mic,
+  Volume2,
   Send,
   X,
   Loader2,
@@ -15,6 +16,7 @@ import {
   sendChatMessage,
   uploadIdPhoto,
   getUploadedImageUrl,
+  textToSpeech,
   transcribeAudio,
   confirmAction,
   type ProposedAction,
@@ -40,6 +42,7 @@ type Message = {
   proposedAction?: ProposedAction;
   imageUrl?: string;
   isImageUpload?: boolean;
+  audioUrl?: string;
 };
 
 export default function ChatbotWidget() {
@@ -63,6 +66,7 @@ export default function ChatbotWidget() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedAction, setSelectedAction] = useState<ProposedAction | null>(null);
+  const [ttsGeneratingIndex, setTtsGeneratingIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,10 +76,23 @@ export default function ChatbotWidget() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const ttsObjectUrlsRef = useRef<string[]>([]);
 
   // Absher primary palette
   const brandColor = useMemo(() => "#009A93", []);
   const brandDark = useMemo(() => "#0B7F74", []);
+
+  const latestAssistantIndex = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].from === "assistant") {
+        return i;
+      }
+    }
+    return -1;
+  }, [messages]);
+
+  const latestAssistantMessage =
+    latestAssistantIndex >= 0 ? messages[latestAssistantIndex] : null;
 
   // Get user_id on mount
   useEffect(() => {
@@ -236,6 +253,43 @@ export default function ChatbotWidget() {
 
   const triggerImageUpload = () => {
     fileInputRef.current?.click();
+  };
+
+  const handlePlayTextToSpeech = async (text: string | undefined, messageIndex: number) => {
+    if (!text?.trim() || ttsGeneratingIndex !== null) return;
+
+    setTtsGeneratingIndex(messageIndex);
+
+    try {
+      let audioUrl = messages[messageIndex]?.audioUrl;
+
+      if (!audioUrl) {
+        audioUrl = await textToSpeech(text);
+        ttsObjectUrlsRef.current.push(audioUrl);
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          if (updated[messageIndex]) {
+            updated[messageIndex] = { ...updated[messageIndex], audioUrl };
+          }
+          return updated;
+        });
+      }
+
+      const audio = new Audio(audioUrl);
+      await audio.play();
+    } catch (error) {
+      console.error("Error generating speech:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          from: "assistant",
+          text: "تعذر إنشاء الصوت حالياً. يرجى المحاولة لاحقاً.",
+        },
+      ]);
+    } finally {
+      setTtsGeneratingIndex(null);
+    }
   };
 
   const handleExecuteAction = (action: ProposedAction) => {
@@ -444,6 +498,7 @@ export default function ChatbotWidget() {
   useEffect(() => {
     return () => {
       stopMicrophone();
+      ttsObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
 
@@ -588,26 +643,40 @@ export default function ChatbotWidget() {
                   )}
 
                   {/* Latest Assistant Response */}
-                  {messages.length > 0 && messages[messages.length - 1].from === "assistant" && (
+                  {messages.length > 0 && messages[messages.length - 1].from === "assistant" && latestAssistantMessage && (
                     <div className="w-full max-w-2xl">
                       <div className="bg-white rounded-2xl border border-[#e6efed] p-6 shadow-lg">
-                        <div className="text-xs font-semibold text-[#0B7F74] mb-3 text-right">
-                          رد المساعد:
+                        <div className="mb-3 flex items-center justify-between text-xs font-semibold text-[#0B7F74] text-right">
+                          <span>رد المساعد:</span>
+                          <button
+                            type="button"
+                            onClick={() => handlePlayTextToSpeech(latestAssistantMessage.text, latestAssistantIndex)}
+                            disabled={ttsGeneratingIndex === latestAssistantIndex || !latestAssistantMessage.text?.trim()}
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[#0B7F74] transition hover:bg-[#f0fbf8] disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label="تشغيل الرد صوتياً"
+                          >
+                            {ttsGeneratingIndex === latestAssistantIndex ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+                            ) : (
+                              <Volume2 className="h-3.5 w-3.5" strokeWidth={2} />
+                            )}
+                            <span className="text-[10px] font-semibold">سماع</span>
+                          </button>
                         </div>
                         <p className="text-base text-[#1f3a37] text-right leading-relaxed whitespace-pre-wrap">
-                          {messages[messages.length - 1].text}
+                          {latestAssistantMessage.text}
                         </p>
-                        {messages[messages.length - 1].proposedAction && (
+                        {latestAssistantMessage.proposedAction && (
                           <div className="mt-4 pt-4 border-t border-[#e6efed]">
                             <div className="text-sm font-semibold text-[#0B7F74] mb-2 text-right">
                               إجراء مقترح:
                             </div>
                             <div className="text-sm text-[#1f3a37] mb-3 text-right">
-                              {messages[messages.length - 1].proposedAction?.description}
+                              {latestAssistantMessage.proposedAction?.description}
                             </div>
                             <button
                               type="button"
-                              onClick={() => handleExecuteAction(messages[messages.length - 1].proposedAction!)}
+                              onClick={() => handleExecuteAction(latestAssistantMessage.proposedAction!)}
                               className="w-full px-4 py-2 rounded-lg bg-[#0FAE9E] text-white text-sm font-medium hover:bg-[#0B7F74] transition"
                             >
                               تنفيذ الإجراء
@@ -689,8 +758,22 @@ export default function ChatbotWidget() {
                             </div>
                           )}
                           {message.from === "assistant" && (
-                            <div className="mt-2 text-[11px] text-[#4d6f6a]">
-                              بوت • الآن
+                            <div className="mt-2 flex items-center justify-between text-[11px] text-[#4d6f6a]">
+                              <span>بوت • الآن</span>
+                              <button
+                                type="button"
+                                onClick={() => handlePlayTextToSpeech(message.text, index)}
+                                disabled={ttsGeneratingIndex === index || !message.text?.trim()}
+                                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[#0B7F74] transition hover:bg-[#f0fbf8] disabled:cursor-not-allowed disabled:opacity-50"
+                                aria-label="تشغيل الرد صوتياً"
+                              >
+                                {ttsGeneratingIndex === index ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+                                ) : (
+                                  <Volume2 className="h-3.5 w-3.5" strokeWidth={2} />
+                                )}
+                                <span className="text-[10px] font-semibold">سماع</span>
+                              </button>
                             </div>
                           )}
                           {message.proposedAction && (
