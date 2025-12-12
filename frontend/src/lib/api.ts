@@ -138,6 +138,57 @@ export function getUploadedImageUrl(filename: string): string {
   return `${API_BASE_URL}/uploads/${filename}`;
 }
 
+// Transcribe audio to text
+export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "recording.webm");
+
+  const response = await fetch(`${API_BASE_URL}/voice/transcribe`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Transcription failed: ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data.text || "";
+}
+
+// Confirm action (after payment)
+export interface ConfirmActionRequest {
+  user_id: string;
+  action_id: string;
+  accepted: boolean;
+  service_type: string;
+}
+
+export interface ConfirmActionResponse {
+  status: string;
+  detail: string;
+}
+
+export async function confirmAction(
+  request: ConfirmActionRequest
+): Promise<ConfirmActionResponse> {
+  const response = await fetch(`${API_BASE_URL}/confirm-action`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Confirm action failed: ${errorText}`);
+  }
+
+  return response.json();
+}
+
 // Check backend health
 export async function checkHealth(): Promise<boolean> {
   try {
